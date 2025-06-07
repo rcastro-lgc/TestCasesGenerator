@@ -119,7 +119,6 @@ The `pip install -e .` command will install all necessary dependencies from `set
 ## 🌱 Future Improvements
 
 - **Duplicate Prevention**: Avoid re-generating questions for tickets that have already been processed to save API tokens.
-- **Test Case Generation**: Automatically generate functional test cases from ticket descriptions using AI.
 - **Live Documentation**: Create and maintain a dedicated, version-controlled Markdown file for each ticket, containing its summary, key questions, and suggested tests.
 - **Cross-Ticket Awareness**: Use embeddings to detect related tickets and provide impact analysis (e.g., "This change might affect...").
 - **Jira Integration**: Optionally post generated questions or test cases back into the corresponding Jira ticket as comments.
