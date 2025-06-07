@@ -14,7 +14,7 @@
 - 🧠 Analyzes and embeds tickets for semantic understanding
 - 💬 Matches transcripts of refinement meetings to existing tickets
 - ❓ Automatically generates pre-refinement questions (GPT-powered)
-- 🧪 [Planned] Test case generation from ticket context
+- 🧪 Test case generation from ticket context
 - 📄 [Planned] Live documentation generation and update
 - ☁️ [Planned] Optional posting of results back to Jira
 
