@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProRef - Output Viewer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        .collapsible {
+            background-color: var(--light-color);
+            color: var(--dark-color);
+            cursor: pointer;
+            padding: 18px;
+            width: 100%;
+            border: none;
+            text-align: left;
+            outline: none;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.3s;
+        }
+
+        .active, .collapsible:hover {
+            background-color: var(--border-color);
+        }
+
+        .collapsible-content {
+            padding: 0 18px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-out;
+            background-color: var(--card-color);
+            border-radius: 0 0 5px 5px;
+            margin-bottom: 15px;
+        }
+
+        /* When collapsible content is shown, ensure proper overflow */
+        .collapsible-content[style*="max-height"]:not([style*="max-height: 0"]) {
+            overflow-y: visible;
+            padding: 18px;
+        }
+
+        .collapsible:after {
+            content: '+';
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .active:after {
+            content: '-';
+        }
+
+        .ticket-type {
+            font-size: 14px;
+            color: var(--primary-color);
+            margin-left: 10px;
+            font-weight: normal;
+        }
+        
+        .test-case {
+            background-color: var(--card-color);
+            border-left: 4px solid var(--primary-color);
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: block; /* Ensure test cases are always visible */
+        }
+        
+        .test-case h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+        
+        .test-case-content {
+            display: block; /* Ensure test case content is always visible */
+            padding: 5px 0;
+        }
+        
+        .test-case ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        
+        .test-case li {
+            margin-bottom: 8px;
+        }
+        
+        /* Make sure expanded tickets show all content */
+        .active + .collapsible-content {
+            height: auto;
+            overflow: visible;
+        }
+        
+        /* Show ticket content immediately when expanded */
+        .active + .collapsible-content .test-case {
+            display: block;
+        }
+        
+        /* Fix for Safari and other browsers */
+        .collapsible-content[style*="max-height"] {
+            overflow: visible;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 ProRef - Output Viewer</h1>
+            <div class="breadcrumb">
+                <a href="{{ url_for('home') }}">Home</a> &gt; 
+                {% if output_type == 'questions' %}
+                    Questions
+                {% elif output_type == 'test_cases' %}
+                    Test Cases
+                {% endif %}
+            </div>
+        </header>
+
+        <div class="output-viewer">
+            <div id="markdown-content"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const content = `{{ content|safe }}`;
+            const outputType = "{{ output_type }}";
+            
+            if (outputType === 'test_cases') {
+                // For test cases, create collapsible tickets with their test cases
+                createTicketsWithTestCases(content);
+            } else {
+                // For other types, just render markdown
+                document.getElementById('markdown-content').innerHTML = marked.parse(content);
+            }
+            
+            // Add debug info to console
+            console.log('Content loaded. Output type:', outputType);
+        });
+
+        function createTicketsWithTestCases(markdownContent) {
+            const container = document.getElementById('markdown-content');
+            container.innerHTML = ''; // Clear container
+            
+            // Split content by ticket sections (## headers)
+            const ticketSections = markdownContent.split(/(?=## )/);
+            console.log('Found ' + ticketSections.length + ' ticket sections');
+            
+            ticketSections.forEach((section, index) => {
+                if (!section.trim()) return; // Skip empty sections
+                
+                // Extract ticket header and content
+                const headerMatch = section.match(/## (.+?)\n/);
+                if (!headerMatch) return;
+                
+                const headerText = headerMatch[1];
+                const typeMatch = section.match(/\*\*Type:\*\* (.+?)\n/);
+                const ticketType = typeMatch ? typeMatch[1] : '';
+                
+                console.log('Processing ticket: ' + headerText);
+                
+                // Create ticket container
+                const ticketContainer = document.createElement('div');
+                ticketContainer.className = 'ticket-container';
+                ticketContainer.id = 'ticket-' + index;
+                
+                // Create collapsible button for ticket
+                const button = document.createElement('button');
+                button.className = 'collapsible';
+                button.textContent = headerText;
+                
+                // Add ticket type span if available
+                if (ticketType) {
+                    const typeSpan = document.createElement('span');
+                    typeSpan.className = 'ticket-type';
+                    typeSpan.textContent = ticketType;
+                    button.appendChild(typeSpan);
+                }
+                
+                // Create content div for the ticket
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'collapsible-content';
+                contentDiv.id = 'content-' + index;
+                
+                // Extract test cases
+                // First, get the content after the ticket header and type
+                let contentText = section;
+                contentText = contentText.replace(/## .+?\n/, ''); // Remove the main header
+                contentText = contentText.replace(/\*\*Type:\*\* .+?\n\n/, ''); // Remove the type line
+                
+                // Check if there are test cases
+                if (contentText.includes('### ✅ Test Case')) {
+                    // Split test cases and process each one
+                    const testCases = contentText.split(/(?=### ✅ Test Case)/);
+                    console.log('Found ' + testCases.length + ' test cases for ticket: ' + headerText);
+                    
+                    testCases.forEach((testCase, tcIndex) => {
+                        if (!testCase.trim()) return;
+                        
+                        const testCaseElement = document.createElement('div');
+                        testCaseElement.className = 'test-case';
+                        testCaseElement.id = 'test-case-' + index + '-' + tcIndex;
+                        
+                        // Extract the test case title for better formatting
+                        const titleMatch = testCase.match(/### (✅ Test Case \d+)/);
+                        if (titleMatch) {
+                            const title = document.createElement('h3');
+                            title.textContent = titleMatch[1];
+                            testCaseElement.appendChild(title);
+                            
+                            // Format the rest of the content
+                            const content = testCase.replace(/### ✅ Test Case \d+\n/, '');
+                            const contentEl = document.createElement('div');
+                            contentEl.className = 'test-case-content';
+                            contentEl.innerHTML = marked.parse(content);
+                            testCaseElement.appendChild(contentEl);
+                        } else {
+                            testCaseElement.innerHTML = marked.parse(testCase);
+                        }
+                        
+                        contentDiv.appendChild(testCaseElement);
+                    });
+                } else {
+                    // No test cases or unstructured content
+                    console.log('No test cases found for ticket: ' + headerText);
+                    contentDiv.innerHTML = marked.parse(contentText);
+                }
+                
+                // Add to container
+                ticketContainer.appendChild(button);
+                ticketContainer.appendChild(contentDiv);
+                container.appendChild(ticketContainer);
+                
+                // Add click event for ticket collapsible
+                button.addEventListener('click', function() {
+                    this.classList.toggle('active');
+                    const content = this.nextElementSibling;
+                    
+                    if (content.style.maxHeight) {
+                        console.log('Collapsing ticket: ' + headerText);
+                        content.style.maxHeight = null;
+                    } else {
+                        console.log('Expanding ticket: ' + headerText);
+                        // Calculate the full height including all test cases
+                        content.style.maxHeight = 'none'; // Temporarily set to none to get full height
+                        const scrollHeight = content.scrollHeight;
+                        content.style.maxHeight = '0px'; // Reset to trigger animation
+                        
+                        // Force reflow
+                        content.offsetHeight;
+                        
+                        // Set to actual height + buffer for any dynamic content
+                        content.style.maxHeight = scrollHeight + 500 + 'px';
+                        console.log('Set height to: ' + (scrollHeight + 500) + 'px');
+                    }
+                });
+            });
+        }
+    </script>
+</body>
+</html>

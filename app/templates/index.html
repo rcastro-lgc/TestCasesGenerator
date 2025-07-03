@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProRef - Product Refinement Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/env-alerts.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 ProRef - Product Refinement Assistant</h1>
+            <p>Run scripts and manage your workflow easily</p>
+        </header>
+
+        {% if missing_vars %}
+        <div class="alert alert-warning">
+            <h2>⚠️ Missing Environment Variables</h2>
+            <p>Please set the following environment variables in your <code>.env</code> file:</p>
+            <ul>
+                {% for var in missing_vars %}
+                <li>{{ var }}</li>
+                {% endfor %}
+            </ul>
+            <p>See <a href="#" onclick="showEnvInstructions()">Environment Setup Instructions</a> for help.</p>
+        </div>
+        
+        <div id="env-instructions" class="modal" style="display: none;">
+            <div class="modal-content">
+                <span class="close" onclick="hideEnvInstructions()">&times;</span>
+                <h2>Environment Setup Instructions</h2>
+                <p>Create or edit the <code>.env</code> file in the project root directory with the following content:</p>
+                <pre><code># Google API Configuration
+GOOGLE_API_KEY=your-google-api-key-here
+
+# Jira Configuration
+JIRA_BASE_URL=https://your-organization.atlassian.net
+JIRA_USER=your-jira-email@example.com
+JIRA_API_TOKEN=your-jira-api-token
+
+# Project/Sprint Configuration (uncomment and set one of these options)
+JIRA_PROJECT=YOUR_PROJECT_KEY
+JIRA_SPRINT="Your Sprint Name"
+# JIRA_JQL=project = YOUR_PROJECT AND Sprint = "Your Sprint Name" ORDER BY updated DESC
+
+# Optional Model Configuration
+MODEL_QUESTIONS=gemini-1.5-pro
+MODEL_TESTCASES=gemini-1.5-flash</code></pre>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="tasks-grid">
+            <!-- Fetch Backlog -->
+            <div class="task-card" id="fetch-backlog-card">
+                <h2>📥 Fetch Backlog</h2>
+                <p>Fetch tickets from Jira using configured JQL</p>
+                <div class="task-controls">
+                    <button id="run-fetch-backlog" class="run-button" {% if missing_vars %}disabled{% endif %}>Run</button>
+                    <button id="stop-fetch-backlog" class="stop-button" disabled>Stop</button>
+                </div>
+                <div class="status-indicator">
+                    <span class="status-label">Status:</span>
+                    <span class="status-value" id="fetch-backlog-status">{{ process_status['fetch_backlog']['status'] }}</span>
+                </div>
+                <div class="output-area">
+                    <h3>Output</h3>
+                    <div class="output-container" id="fetch-backlog-output">
+                        {% for line in process_status['fetch_backlog']['output'] %}
+                            <div>{{ line }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Generate Questions -->
+            <div class="task-card" id="generate-questions-card">
+                <h2>❓ Generate Questions</h2>
+                <p>Generate pre-refinement questions for tickets</p>
+                <div class="task-controls">
+                    <button id="run-generate-questions" class="run-button" {% if missing_vars %}disabled{% endif %}>Run</button>
+                    <button id="stop-generate-questions" class="stop-button" disabled>Stop</button>
+                </div>
+                <div class="status-indicator">
+                    <span class="status-label">Status:</span>
+                    <span class="status-value" id="generate-questions-status">{{ process_status['generate_questions']['status'] }}</span>
+                </div>
+                <div class="output-area">
+                    <h3>Output</h3>
+                    <div class="output-container" id="generate-questions-output">
+                        {% for line in process_status['generate_questions']['output'] %}
+                            <div>{{ line }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% if process_status['generate_questions']['status'] == 'completed' %}
+                <div class="view-results">
+                    <a href="{{ url_for('view_output', output_type='questions') }}" class="view-button">View Questions</a>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Generate Test Cases -->
+            <div class="task-card" id="generate-test-cases-card">
+                <h2>🧪 Generate Test Cases</h2>
+                <p>Generate test cases for tickets</p>
+                <div class="task-controls">
+                    <button id="run-generate-test-cases" class="run-button" {% if missing_vars %}disabled{% endif %}>Run</button>
+                    <button id="stop-generate-test-cases" class="stop-button" disabled>Stop</button>
+                </div>
+                <div class="status-indicator">
+                    <span class="status-label">Status:</span>
+                    <span class="status-value" id="generate-test-cases-status">{{ process_status['generate_test_cases']['status'] }}</span>
+                </div>
+                <div class="output-area">
+                    <h3>Output</h3>
+                    <div class="output-container" id="generate-test-cases-output">
+                        {% for line in process_status['generate_test_cases']['output'] %}
+                            <div>{{ line }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% if process_status['generate_test_cases']['status'] == 'completed' %}
+                <div class="view-results">
+                    <a href="{{ url_for('view_output', output_type='test_cases') }}" class="view-button">View Test Cases</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+        function showEnvInstructions() {
+            document.getElementById('env-instructions').style.display = 'block';
+        }
+        
+        function hideEnvInstructions() {
+            document.getElementById('env-instructions').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

@@ -3,8 +3,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# API Keys
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
-# Modelos por tipo de tarea
-MODEL_QUESTIONS = os.getenv("OPENAI_MODEL_QUESTIONS", "gpt-4-turbo")
-MODEL_TESTCASES = os.getenv("OPENAI_MODEL_TESTCASES", "gpt-3.5-turbo")
+# Models by task type
+MODEL_QUESTIONS = os.getenv("MODEL_QUESTIONS", "gemini-1.5-pro")
+MODEL_TESTCASES = os.getenv("MODEL_TESTCASES", "gemini-1.5-flash")
+
+# API Provider
+API_PROVIDER = "gemini"

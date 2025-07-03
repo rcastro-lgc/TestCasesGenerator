@@ -73,17 +73,37 @@ JIRA_SPRINT=your-sprint-name
 # or provide your own custom JQL query:
 JIRA_JQL=project = YOUR_PROJECT_KEY AND Sprint = "your-sprint-name" ORDER BY updated DESC
 
-# OpenAI Configuration
-OPENAI_API_KEY=sk-your_openai_api_key
+# AI Provider Configuration
+API_PROVIDER=gemini
 
-# OpenAI Model Configuration (Optional)
-OPENAI_MODEL_QUESTIONS=gpt-4-turbo
-OPENAI_MODEL_TESTCASES=gpt-3.5-turbo
+# Google Gemini Configuration
+GOOGLE_API_KEY=your_google_api_key_here
+MODEL_QUESTIONS=gemini-1.5-pro
+MODEL_TESTCASES=gemini-1.5-flash
 ```
 
 The default JQL query will be constructed using `JIRA_PROJECT` and `JIRA_SPRINT` if `JIRA_JQL` is not provided. If you need a custom query, you can set `JIRA_JQL` directly.
 
 The `pip install -e .` command will install all necessary dependencies from `setup.py` and make the project's scripts available in your environment.
+
+### Setting up Google Gemini API
+
+To use the Google Gemini API:
+
+1. Go to the [Google AI Studio](https://ai.google.dev/)
+2. Sign in with your Google account
+3. Navigate to "Get API key" in the menu
+4. Create a new API key
+5. Copy the API key and add it to your `.env` file as `GOOGLE_API_KEY`
+
+The application uses Google Gemini as its AI provider (set as `API_PROVIDER=gemini` in your `.env` file).
+
+For detailed instructions on configuring Gemini, see [GEMINI_SETUP.md](docs/GEMINI_SETUP.md)
+
+You can test your Gemini setup with:
+```bash
+python scripts/test_gemini_setup.py
+```
 
 ---
 

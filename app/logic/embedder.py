@@ -1,30 +1,32 @@
 import os
-import openai
 import numpy as np
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
 
-EMBEDDING_MODEL = "text-embedding-3-small"
+EMBEDDING_DIMENSION = 768  # Default embedding dimension for Google's text-embedding
 
 def get_embedding(text: str) -> list:
     if not text.strip():
-        return [0.0] * 1536
+        return [0.0] * EMBEDDING_DIMENSION
 
-    # ✅ Truncar si es muy largo (~8000 tokens ≈ ~30K chars)
+    # Truncate if too long (based on character count)
     if len(text) > 30000:
         text = text[:30000]
 
     try:
-        response = openai.embeddings.create(
-            model=EMBEDDING_MODEL,
-            input=text.strip()
+        # Use Google's embedding model
+        model = genai.get_embeddings_model()
+        response = model.embed_content(
+            content=text.strip(),
+            task_type="RETRIEVAL_QUERY"
         )
-        return response.data[0].embedding
+        return response.embedding
     except Exception as e:
         print(f"❌ Error generating embedding: {e}")
-        return [0.0] * 1536
+        return [0.0] * EMBEDDING_DIMENSION
 
 def cosine_similarity(vec1: list, vec2: list) -> float:
     a = np.array(vec1)

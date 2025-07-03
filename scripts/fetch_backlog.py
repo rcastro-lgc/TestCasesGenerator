@@ -37,7 +37,7 @@ else:
     JQL = JIRA_JQL
 
 def fetch_backlog():
-    print("🔄 Inicializando base de datos...")
+    print("🔄 Initializing database...")
     init_db()
 
     url = f"{JIRA_BASE_URL}/rest/api/3/search"
@@ -52,7 +52,7 @@ def fetch_backlog():
         "maxResults": 150
     }
 
-    print("📡 Consultando tickets desde Jira...")
+    print("📡 Querying tickets from Jira...")
     response = requests.get(url, headers=headers, params=params, auth=auth)
 
     if response.status_code == 200:
@@ -75,7 +75,7 @@ def fetch_backlog():
             issue_type = fields.get("issuetype", {}).get("name", "").lower()
 
             if issue_type == "spike":
-                print(f"⏭️  Ignorando SPIKE: {key}")
+                print(f"⏭️  Skipping SPIKE: {key}")
                 continue
 
             ticket_data = {
@@ -89,13 +89,13 @@ def fetch_backlog():
             }
 
             save_or_update_ticket(ticket_data)
-            print(f"✅ Guardado: [{key}] {fields['summary']}")
+            print(f"✅ Saved: [{key}] {fields['summary']}")
     else:
         print(f"❌ Error: {response.status_code}")
         print(response.text)
 
     print(
-        f"✅ Total tickets procesados (sin Spikes): {len([i for i in issues if i['fields'].get('issuetype', {}).get('name', '').lower() != 'spike'])}")
+        f"✅ Total tickets processed (excluding Spikes): {len([i for i in issues if i['fields'].get('issuetype', {}).get('name', '').lower() != 'spike'])}")
 
 
 if __name__ == "__main__":

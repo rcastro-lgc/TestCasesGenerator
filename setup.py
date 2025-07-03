@@ -8,12 +8,12 @@ setup(
         "requests>=2.32.3",
         "numpy>=2.2.5",
         "python-dotenv>=1.1.0",
-        "openai>=1.78.1",
         "SQLAlchemy>=2.0.41",
         "tiktoken>=0.9.0",
         "tqdm>=4.67.1",
         "httpx>=0.28.1",
-        "pydantic>=2.11.4"
+        "pydantic>=2.11.4",
+        "google-generativeai>=0.3.2"
     ],
     python_requires=">=3.8",
     author="ProRef Team",

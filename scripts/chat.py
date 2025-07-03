@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
 Intelligent chatbot for querying Jira ticket information.
-Uses GPT to analyze and answer questions based on tickets.
+Uses Google Gemini to analyze and answer questions based on tickets.
 """
 
 import os
 import sys
 from pathlib import Path
-from openai import OpenAI
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 # Add the project root directory to Python path
@@ -20,7 +20,8 @@ from app.db.model import SessionLocal, Ticket
 
 # Load environment variables
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Configure Gemini API
+genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
 
 def format_ticket_for_context(ticket, score=None):
     """Format a ticket for use as context in the prompt."""
@@ -35,7 +36,7 @@ Relevance: {relevance}
 """
 
 def generate_response(question: str, relevant_tickets: list) -> str:
-    """Generate a coherent response using GPT."""
+    """Generate a coherent response using Gemini."""
     # Prepare context with relevant tickets
     context = "\n".join(format_ticket_for_context(ticket, score) for ticket, score in relevant_tickets)
     
@@ -57,12 +58,10 @@ Instructions:
 Response:"""
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4-turbo-preview",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
-        )
-        return response.choices[0].message.content
+        # Simplified approach using genai
+        model = genai.models.get_model("gemini-pro")
+        response = model.generate_content(prompt)
+        return response.text
     except Exception as e:
         return f"Error generating response: {str(e)}"
 

@@ -2,11 +2,11 @@ import os
 from app.db.model import SessionLocal, Ticket
 from app.logic.question_generator import generate_questions
 
-# Ruta de salida
+# Output path
 output_path = os.path.abspath("../data/questions/questions_by_ticket.md")
 os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-# Obtener tickets que aún no fueron procesados
+# Get tickets that haven't been processed yet
 session = SessionLocal()
 tickets = session.query(Ticket).filter(
     Ticket.issue_type != "Spike",
@@ -25,7 +25,7 @@ with open(output_path, "w", encoding="utf-8") as f:
             f.write("**Generated questions:**\n")
             for q in questions:
                 f.write(f"- {q}\n")
-            # Marcar el ticket como procesado
+            # Mark ticket as processed
             ticket.questions_generated = True
             session.add(ticket)
         else:
@@ -35,4 +35,4 @@ with open(output_path, "w", encoding="utf-8") as f:
 
 session.commit()
 session.close()
-print(f"✅ Preguntas generadas y guardadas en: {output_path}")
+print(f"✅ Questions generated and saved to: {output_path}")

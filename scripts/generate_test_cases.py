@@ -2,11 +2,11 @@ from app.db.model import SessionLocal, Ticket
 from app.logic.test_case_generator import generate_test_cases
 import os
 
-# Ruta de salida
+# Output path
 output_path = "../data/test_cases/test_cases_by_ticket.md"
 os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-# Obtener todos los tickets válidos
+# Get all valid tickets
 session = SessionLocal()
 tickets = session.query(Ticket).filter(
     Ticket.test_cases_generated == False,
