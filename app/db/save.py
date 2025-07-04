@@ -1,5 +1,6 @@
 from datetime import datetime
-from app.db.model import Ticket, SessionLocal
+from app.db.model import Ticket, TestCase, SessionLocal
+import uuid
 
 def save_or_update_ticket(ticket_data):
     session = SessionLocal()
@@ -28,3 +29,35 @@ def save_or_update_ticket(ticket_data):
 
     session.commit()
     session.close()
+
+def save_test_case(ticket_id, scenario, action, expected_behavior):
+    """
+    Save a test case to the database.
+    
+    Args:
+        ticket_id: The ID of the ticket that this test case belongs to
+        scenario: The test scenario description
+        action: The action to perform in the test
+        expected_behavior: The expected behavior or outcome
+    
+    Returns:
+        The created TestCase object
+    """
+    session = SessionLocal()
+    
+    test_case = TestCase(
+        id=str(uuid.uuid4()),
+        ticket_id=ticket_id,
+        scenario=scenario,
+        action=action,
+        expected_behavior=expected_behavior,
+        created_at=datetime.utcnow()
+    )
+    
+    session.add(test_case)
+    session.commit()
+    
+    session.refresh(test_case)
+    session.close()
+    
+    return test_case

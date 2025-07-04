@@ -1,0 +1,54 @@
+/* Ticket list styles */
+.tickets-list-area {
+    margin-top: 20px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+}
+
+.tickets-list-area h3 {
+    margin-bottom: 10px;
+    color: var(--primary-color);
+    font-size: 18px;
+}
+
+.tickets-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 14px;
+}
+
+.tickets-table th {
+    background-color: var(--light-color);
+    padding: 8px;
+    text-align: left;
+    border-bottom: 2px solid var(--border-color);
+    font-weight: bold;
+}
+
+.tickets-table td {
+    padding: 8px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: top;
+}
+
+.tickets-table tr:hover {
+    background-color: rgba(236, 240, 241, 0.5);
+}
+
+.tickets-table tr:nth-child(even) {
+    background-color: rgba(236, 240, 241, 0.3);
+}
+
+.tickets-table td:first-child {
+    font-family: monospace;
+    font-weight: bold;
+}
+
+/* Make the table responsive */
+@media screen and (max-width: 768px) {
+    .tickets-table {
+        display: block;
+        overflow-x: auto;
+    }
+}

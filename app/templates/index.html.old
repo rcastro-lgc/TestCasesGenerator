@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProRef - Product Refinement Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/env-alerts.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/test-cases.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tickets-table.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/new-ui.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 ProRef - Product Refinement Assistant</h1>
+            <p>Fetch tickets and generate test cases</p>
+        </header>
+
+        {% if missing_vars %}
+        <div class="alert alert-warning">
+            <h2>⚠️ Missing Environment Variables</h2>
+            <p>Please set the following environment variables in your <code>.env</code> file:</p>
+            <ul>
+                {% for var in missing_vars %}
+                <li>{{ var }}</li>
+                {% endfor %}
+            </ul>
+            <p>See <a href="#" onclick="showEnvInstructions()">Environment Setup Instructions</a> for help.</p>
+        </div>
+        
+        <div id="env-instructions" class="modal" style="display: none;">
+            <div class="modal-content">
+                <span class="close" onclick="hideEnvInstructions()">&times;</span>
+                <h2>Environment Setup Instructions</h2>
+                <p>Create or edit the <code>.env</code> file in the project root directory with the following content:</p>
+                <pre><code># Google API Configuration
+GOOGLE_API_KEY=your-google-api-key-here
+
+# Jira Configuration
+JIRA_BASE_URL=https://your-organization.atlassian.net
+JIRA_USER=your-jira-email@example.com
+JIRA_API_TOKEN=your-jira-api-token
+
+# Project/Sprint Configuration (uncomment and set one of these options)
+JIRA_PROJECT=YOUR_PROJECT_KEY
+JIRA_SPRINT="Your Sprint Name"
+# JIRA_JQL=project = YOUR_PROJECT AND Sprint = "Your Sprint Name" ORDER BY updated DESC
+
+# Optional Model Configuration
+MODEL_QUESTIONS=gemini-1.5-pro
+MODEL_TESTCASES=gemini-1.5-flash</code></pre>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- Fetch Backlog Section -->
+            <div class="section" id="fetch-backlog-section">
+                <div class="section-header">
+                    <h2>📥 Fetch Backlog</h2>
+                    <button id="run-fetch-backlog" class="run-button" {% if missing_vars %}disabled{% endif %}>Fetch Tickets</button>
+                </div>
+                
+                <div class="section-status">
+                    <span class="status-label">Status:</span>
+                    <span class="status-value" id="fetch-backlog-status">{{ process_status['fetch_backlog']['status'] }}</span>
+                </div>
+                
+                <div class="output-area" id="fetch-backlog-output-area">
+                    <h3>Output</h3>
+                    <div class="output-container" id="fetch-backlog-output">
+                        {% for line in process_status['fetch_backlog']['output'] %}
+                            <div>{{ line }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tickets List Section -->
+            <div class="section" id="tickets-section">
+                <div class="section-header">
+                    <h2>🎫 Tickets</h2>
+                </div>
+                
+                <div class="tickets-list">
+                    {% if tickets_data %}
+                        {% for ticket in tickets_data %}
+                            <div class="ticket-item" id="ticket-{{ ticket.jira_key }}">
+                                <div class="ticket-header">
+                                    <div class="ticket-title">
+                                        <h3>{{ ticket.jira_key }} - {{ ticket.title }}</h3>
+                                        <span class="ticket-type">{{ ticket.issue_type }}</span>
+                                        <span class="ticket-status">{{ ticket.status }}</span>
+                                    </div>
+                                    <div class="ticket-actions">
+                                        {% if not ticket.has_test_cases %}
+                                            <button class="generate-button" onclick="generateTestCases('{{ ticket.jira_key }}')">Generate Test Cases</button>
+                                        {% else %}
+                                            <span class="test-cases-badge">✅ Test Cases Generated</span>
+                                        {% endif %}
+                                        <button class="expand-button" onclick="expandTicket('{{ ticket.jira_key }}')">▼</button>
+                                    </div>
+                                </div>
+                                
+                                <div class="ticket-details" id="details-{{ ticket.jira_key }}" style="display: none;">
+                                    <div class="ticket-description">
+                                        <h4>Description</h4>
+                                        <div class="description-content">{{ ticket.description }}</div>
+                                    </div>
+                                    
+                                    <div class="ticket-test-cases" id="test-cases-{{ ticket.jira_key }}">
+                                        {% if ticket.test_cases %}
+                                            <h4>Test Cases</h4>
+                                            {% for test_case in ticket.test_cases %}
+                                                <div class="test-case">
+                                                    <h5>Test Case {{ loop.index }}</h5>
+                                                    <p><strong>Scenario:</strong> <em>{{ test_case.scenario }}</em></p>
+                                                    <p><strong>Action:</strong> <em>{{ test_case.action }}</em></p>
+                                                    <p><strong>Expected behavior:</strong> <em>{{ test_case.expected_behavior }}</em></p>
+                                                </div>
+                                            {% endfor %}
+                                        {% elif ticket.has_test_cases %}
+                                            <div class="loading" id="loading-{{ ticket.jira_key }}">
+                                                <p>Loading test cases...</p>
+                                            </div>
+                                        {% else %}
+                                            <p class="no-test-cases">No test cases generated yet.</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% elif process_status['fetch_backlog']['tickets'] %}
+                        {% for ticket in process_status['fetch_backlog']['tickets'] %}
+                            <div class="ticket-item" id="ticket-{{ ticket.jira_key }}">
+                                <div class="ticket-header">
+                                    <div class="ticket-title">
+                                        <h3>{{ ticket.jira_key }} - {{ ticket.title }}</h3>
+                                        <span class="ticket-type">{{ ticket.issue_type }}</span>
+                                        <span class="ticket-status">{{ ticket.status }}</span>
+                                    </div>
+                                    <div class="ticket-actions">
+                                        <button class="generate-button" onclick="generateTestCases('{{ ticket.jira_key }}')">Generate Test Cases</button>
+                                        <button class="expand-button" onclick="expandTicket('{{ ticket.jira_key }}')">▼</button>
+                                    </div>
+                                </div>
+                                
+                                <div class="ticket-details" id="details-{{ ticket.jira_key }}" style="display: none;">
+                                    <div class="ticket-test-cases" id="test-cases-{{ ticket.jira_key }}">
+                                        <p class="no-test-cases">No test cases generated yet.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="no-tickets">No tickets fetched yet. Click the "Fetch Tickets" button to get started.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Show/hide environment instructions
+        function showEnvInstructions() {
+            document.getElementById('env-instructions').style.display = 'block';
+        }
+        
+        function hideEnvInstructions() {
+            document.getElementById('env-instructions').style.display = 'none';
+        }
+        
+        // Expand/collapse ticket details
+        function expandTicket(ticketId) {
+            const detailsEl = document.getElementById('details-' + ticketId);
+            const expandBtn = document.querySelector('#ticket-' + ticketId + ' .expand-button');
+            
+            if (detailsEl.style.display === 'none') {
+                detailsEl.style.display = 'block';
+                expandBtn.textContent = '▲';
+                fetchTestCasesIfNeeded(ticketId);
+            } else {
+                detailsEl.style.display = 'none';
+                expandBtn.textContent = '▼';
+            }
+        }
+        
+        // Fetch test cases if they exist but aren't loaded yet
+        function fetchTestCasesIfNeeded(ticketId) {
+            const testCasesEl = document.getElementById('test-cases-' + ticketId);
+            const loadingEl = document.getElementById('loading-' + ticketId);
+            
+            if (loadingEl) {
+                // Test cases exist but aren't loaded yet
+                fetch('/get_test_cases/' + ticketId)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.test_cases && data.test_cases.length > 0) {
+                            let html = '<h4>Test Cases</h4>';
+                            data.test_cases.forEach((testCase, index) => {
+                                html += `
+                                    <div class="test-case">
+                                        <h5>Test Case ${index + 1}</h5>
+                                        <p><strong>Scenario:</strong> <em>${testCase.scenario}</em></p>
+                                        <p><strong>Action:</strong> <em>${testCase.action}</em></p>
+                                        <p><strong>Expected behavior:</strong> <em>${testCase.expected_behavior}</em></p>
+                                    </div>
+                                `;
+                            });
+                            testCasesEl.innerHTML = html;
+                        } else {
+                            testCasesEl.innerHTML = '<p class="no-test-cases">No test cases found.</p>';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching test cases:', error);
+                        testCasesEl.innerHTML = '<p class="error">Error loading test cases.</p>';
+                    });
+            }
+        }
+        
+        // Generate test cases for a ticket
+        function generateTestCases(ticketId) {
+            const generateBtn = document.querySelector('#ticket-' + ticketId + ' .generate-button');
+            const testCasesEl = document.getElementById('test-cases-' + ticketId);
+            
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Generating...';
+            testCasesEl.innerHTML = '<div class="loading"><p>Generating test cases...</p></div>';
+            
+            // Expand ticket details if not already expanded
+            const detailsEl = document.getElementById('details-' + ticketId);
+            const expandBtn = document.querySelector('#ticket-' + ticketId + ' .expand-button');
+            if (detailsEl.style.display === 'none') {
+                detailsEl.style.display = 'block';
+                expandBtn.textContent = '▲';
+            }
+            
+            fetch('/generate_test_cases/' + ticketId, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Get updated test cases for this ticket
+                        fetch('/get_test_cases/' + ticketId)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.test_cases && data.test_cases.length > 0) {
+                                    let html = '<h4>Test Cases</h4>';
+                                    data.test_cases.forEach((testCase, index) => {
+                                        html += `
+                                            <div class="test-case">
+                                                <h5>Test Case ${index + 1}</h5>
+                                                <p><strong>Scenario:</strong> <em>${testCase.scenario}</em></p>
+                                                <p><strong>Action:</strong> <em>${testCase.action}</em></p>
+                                                <p><strong>Expected behavior:</strong> <em>${testCase.expected_behavior}</em></p>
+                                            </div>
+                                        `;
+                                    });
+                                    testCasesEl.innerHTML = html;
+                                    
+                                    // Update the generate button to show badge
+                                    const actionsEl = document.querySelector('#ticket-' + ticketId + ' .ticket-actions');
+                                    actionsEl.innerHTML = `
+                                        <span class="test-cases-badge">✅ Test Cases Generated</span>
+                                        <button class="expand-button" onclick="expandTicket('${ticketId}')">▲</button>
+                                    `;
+                                } else {
+                                    testCasesEl.innerHTML = '<p class="no-test-cases">No test cases found.</p>';
+                                    generateBtn.disabled = false;
+                                    generateBtn.textContent = 'Generate Test Cases';
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error fetching test cases:', error);
+                                testCasesEl.innerHTML = '<p class="error">Error loading test cases.</p>';
+                                generateBtn.disabled = false;
+                                generateBtn.textContent = 'Generate Test Cases';
+                            });
+                    } else {
+                        testCasesEl.innerHTML = `<p class="error">Error: ${data.message}</p>`;
+                        generateBtn.disabled = false;
+                        generateBtn.textContent = 'Try Again';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error generating test cases:', error);
+                    testCasesEl.innerHTML = '<p class="error">Error generating test cases. Please try again.</p>';
+                    generateBtn.disabled = false;
+                    generateBtn.textContent = 'Try Again';
+                });
+        }
+        
+        // Fetch backlog
+        document.getElementById('run-fetch-backlog').addEventListener('click', function() {
+            this.disabled = true;
+            this.textContent = 'Fetching...';
+            
+            const statusEl = document.getElementById('fetch-backlog-status');
+            statusEl.textContent = 'running';
+            
+            const outputEl = document.getElementById('fetch-backlog-output');
+            outputEl.innerHTML = '<div>Fetching tickets from Jira...</div>';
+            
+            fetch('/run/fetch_backlog', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'started') {
+                        pollStatus('fetch_backlog');
+                    } else {
+                        statusEl.textContent = 'failed';
+                        this.disabled = false;
+                        this.textContent = 'Fetch Tickets';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching backlog:', error);
+                    statusEl.textContent = 'failed';
+                    this.disabled = false;
+                    this.textContent = 'Fetch Tickets';
+                });
+        });
+        
+        // Poll status for fetch backlog
+        function pollStatus(scriptName) {
+            console.log(`Polling status for ${scriptName}...`);
+            
+            // First check the raw process status
+            fetch('/debug/raw_process_status')
+                .then(response => response.json())
+                .then(fullStatus => {
+                    console.log("Full process_status:", fullStatus);
+                })
+                .catch(error => {
+                    console.error('Error fetching raw process status:', error);
+                });
+            
+            fetch('/status/' + scriptName)
+                .then(response => response.json())
+                .then(data => {
+                    console.log(`Status for ${scriptName}:`, data);
+                    const statusEl = document.getElementById(scriptName + '-status');
+                    statusEl.textContent = data.status;
+                    
+                    const outputEl = document.getElementById(scriptName + '-output');
+                    outputEl.innerHTML = '';
+                    
+                    if (data.output) {
+                        data.output.forEach(line => {
+                            const div = document.createElement('div');
+                            div.textContent = line;
+                            outputEl.appendChild(div);
+                        });
+                    }
+                    
+                    if (data.status === 'running') {
+                        setTimeout(() => pollStatus(scriptName), 1000);
+                    } else {
+                        const button = document.getElementById('run-' + scriptName);
+                        button.disabled = false;
+                        button.textContent = 'Fetch Tickets';
+                                 // Update the tickets list without page reload
+                if (data.status === 'completed') {
+                    console.log('Fetch completed, updating tickets list...');
+                    // Check ticket status from debug endpoint
+                    fetch('/debug/fetch_status')
+                        .then(response => response.json())
+                        .then(debug => {
+                            console.log('Debug fetch status:', debug);
+                            // Log all available ticket list elements
+                            console.log('Tickets section:', document.getElementById('tickets-section'));
+                            console.log('All tickets-list elements:', document.querySelectorAll('.tickets-list'));
+                            
+                            // Directly call updateTicketsList with the ticket data from the debug endpoint
+                            if (debug.tickets && debug.tickets.length > 0) {
+                                console.log('Using tickets directly from debug endpoint');
+                                updateTicketsListWithData(debug.tickets);
+                            } else {
+                                console.log('Falling back to standard update');
+                                updateTicketsList();
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error fetching debug status:', error);
+                            updateTicketsList();
+                        });
+                }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error polling status:', error);
+                    setTimeout(() => pollStatus(scriptName), 1000);
+                });
+        }
+        
+        // Function to update the tickets list without page reload
+        function updateTicketsList() {
+            console.log('updateTicketsList() called');
+            
+            // Try to find the tickets section first
+            const ticketsSection = document.getElementById('tickets-section');
+            if (!ticketsSection) {
+                console.error('tickets-section element not found!');
+                return;
+            }
+            
+            // Try different ways to find the tickets list
+            let ticketsList = ticketsSection.querySelector('.tickets-list');
+            if (!ticketsList) {
+                console.log('Could not find .tickets-list inside #tickets-section, trying document-wide selector');
+                ticketsList = document.querySelector('.tickets-list');
+                if (!ticketsList) {
+                    console.error('tickets-list element not found anywhere in the document!');
+                    console.log('Creating tickets-list element');
+                    ticketsList = document.createElement('div');
+                    ticketsList.className = 'tickets-list';
+                    ticketsSection.appendChild(ticketsList);
+                }
+            }
+            
+            console.log('Found tickets list element:', ticketsList);
+            
+            // Show a loading indicator
+            ticketsList.innerHTML = '<p class="loading">Loading tickets...</p>';
+            
+            // Fetch the current list of tickets
+            fetch('/get_tickets')
+                .then(response => {
+                    console.log('Response from /get_tickets:', response);
+                    return response.json();
+                })
+                .then(tickets => {
+                    console.log('Tickets data:', tickets);
+                    if (tickets && tickets.length > 0) {
+                        let html = '';
+                        
+                        // Generate HTML for each ticket
+                        tickets.forEach(ticket => {
+                            html += `
+                                <div class="ticket-item" id="ticket-${ticket.jira_key}">
+                                    <div class="ticket-header">
+                                        <div class="ticket-title">
+                                            <h3>${ticket.jira_key} - ${ticket.title}</h3>
+                                            <span class="ticket-type">${ticket.issue_type}</span>
+                                            <span class="ticket-status">${ticket.status}</span>
+                                        </div>
+                                        <div class="ticket-actions">
+                                            ${!ticket.has_test_cases ? 
+                                                `<button class="generate-button" onclick="generateTestCases('${ticket.jira_key}')">Generate Test Cases</button>` : 
+                                                `<span class="test-cases-badge">✅ Test Cases Generated</span>`
+                                            }
+                                            <button class="expand-button" onclick="expandTicket('${ticket.jira_key}')">▼</button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="ticket-details" id="details-${ticket.jira_key}" style="display: none;">
+                                        <div class="ticket-description">
+                                            <h4>Description</h4>
+                                            <div class="description-content">${ticket.description || 'No description available'}</div>
+                                        </div>
+                                        
+                                        <div class="ticket-test-cases" id="test-cases-${ticket.jira_key}">
+                                            ${ticket.test_cases.length > 0 ? 
+                                                `<h4>Test Cases</h4>
+                                                ${ticket.test_cases.map((testCase, index) => `
+                                                    <div class="test-case">
+                                                        <h5>Test Case ${index + 1}</h5>
+                                                        <p><strong>Scenario:</strong> <em>${testCase.scenario}</em></p>
+                                                        <p><strong>Action:</strong> <em>${testCase.action}</em></p>
+                                                        <p><strong>Expected behavior:</strong> <em>${testCase.expected_behavior}</em></p>
+                                                    </div>
+                                                `).join('')}` : 
+                                                ticket.has_test_cases ? 
+                                                    `<div class="loading" id="loading-${ticket.jira_key}">
+                                                        <p>Loading test cases...</p>
+                                                    </div>` : 
+                                                    `<p class="no-test-cases">No test cases generated yet.</p>`
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        
+                        ticketsList.innerHTML = html;
+                    } else {
+                        ticketsList.innerHTML = '<p class="no-tickets">No tickets fetched yet. Click the "Fetch Tickets" button to get started.</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching tickets:', error);
+                    ticketsList.innerHTML = '<p class="error">Error loading tickets. Please try refreshing the page.</p>';
+                });
+        }
+        
+        // Function to update the tickets list with direct data
+        function updateTicketsListWithData(ticketsData) {
+            console.log('updateTicketsListWithData() called with', ticketsData.length, 'tickets');
+            
+            // Try to find the tickets section first
+            const ticketsSection = document.getElementById('tickets-section');
+            if (!ticketsSection) {
+                console.error('tickets-section element not found!');
+                return;
+            }
+            
+            // Try different ways to find the tickets list
+            let ticketsList = ticketsSection.querySelector('.tickets-list');
+            if (!ticketsList) {
+                console.log('Could not find .tickets-list inside #tickets-section, trying document-wide selector');
+                ticketsList = document.querySelector('.tickets-list');
+                if (!ticketsList) {
+                    console.error('tickets-list element not found anywhere in the document!');
+                    console.log('Creating tickets-list element');
+                    ticketsList = document.createElement('div');
+                    ticketsList.className = 'tickets-list';
+                    ticketsSection.appendChild(ticketsList);
+                }
+            }
+            
+            console.log('Found tickets list element:', ticketsList);
+            
+            // Generate HTML for the tickets directly
+            if (ticketsData && ticketsData.length > 0) {
+                let html = '';
+                
+                // Generate HTML for each ticket
+                ticketsData.forEach(ticket => {
+                    html += `
+                        <div class="ticket-item" id="ticket-${ticket.jira_key}">
+                            <div class="ticket-header">
+                                <div class="ticket-title">
+                                    <h3>${ticket.jira_key} - ${ticket.title}</h3>
+                                    <span class="ticket-type">${ticket.issue_type}</span>
+                                    <span class="ticket-status">${ticket.status}</span>
+                                </div>
+                                <div class="ticket-actions">
+                                    <button class="generate-button" onclick="generateTestCases('${ticket.jira_key}')">Generate Test Cases</button>
+                                    <button class="expand-button" onclick="expandTicket('${ticket.jira_key}')">▼</button>
+                                </div>
+                            </div>
+                            
+                            <div class="ticket-details" id="details-${ticket.jira_key}" style="display: none;">
+                                <div class="ticket-test-cases" id="test-cases-${ticket.jira_key}">
+                                    <p class="no-test-cases">No test cases generated yet.</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                ticketsList.innerHTML = html;
+            } else {
+                ticketsList.innerHTML = '<p class="no-tickets">No tickets found.</p>';
+            }
+        }
+        
+        // Initialize status polling if any scripts are running
+        document.addEventListener('DOMContentLoaded', function() {
+            const fetchStatus = document.getElementById('fetch-backlog-status').textContent;
+            if (fetchStatus === 'running') {
+                pollStatus('fetch_backlog');
+            }
+        });
+    </script>
+</body>
+</html>

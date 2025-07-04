@@ -28,6 +28,22 @@ class Ticket(Base):
     test_cases_generated = Column(Boolean, default=False)
     posted_to_jira = Column(Boolean, default=False)
 
+    # Relationship to the test cases
+    test_cases = relationship("TestCase", back_populates="ticket", cascade="all, delete-orphan")
+
+class TestCase(Base):
+    __tablename__ = 'test_cases'
+    id = Column(String, primary_key=True)
+    ticket_id = Column(String, ForeignKey('tickets.id'), nullable=False)
+    scenario = Column(Text, nullable=False)
+    action = Column(Text, nullable=False)
+    expected_behavior = Column(Text, nullable=False)
+    created_at = Column(DateTime)
+    edited = Column(Boolean, default=False)
+
+    # Relationship to the parent ticket
+    ticket = relationship("Ticket", back_populates="test_cases")
+
 class TicketEmbedding(Base):
     __tablename__ = 'ticket_embeddings'
 

@@ -16,7 +16,7 @@ app = Flask(__name__,
 
 # Store process status
 process_status = {
-    'fetch_backlog': {'status': 'idle', 'output': [], 'start_time': None, 'end_time': None},
+    'fetch_backlog': {'status': 'idle', 'output': [], 'start_time': None, 'end_time': None, 'tickets': []},
     'generate_questions': {'status': 'idle', 'output': [], 'start_time': None, 'end_time': None},
     'generate_test_cases': {'status': 'idle', 'output': [], 'start_time': None, 'end_time': None}
 }
@@ -98,6 +98,9 @@ def run_fetch_backlog():
 
     if response.status_code == 200:
         issues = response.json().get("issues", [])
+        # Clear any previous tickets
+        process_status['fetch_backlog']['tickets'] = []
+        
         for issue in issues:
             key = issue["key"]
             fields = issue["fields"]
@@ -129,11 +132,21 @@ def run_fetch_backlog():
                 "updated_at": updated_at
             }
 
+            # Store the ticket data in our process status
+            process_status['fetch_backlog']['tickets'].append({
+                "jira_key": key,
+                "title": fields.get("summary"),
+                "description": description,  # Include description for UI display
+                "issue_type": issue_type,
+                "status": fields.get("status", {}).get("name", "")
+            })
+
             save_or_update_ticket(ticket_data)
             print(f"✅ Saved: [{key}] {fields['summary']}")
         
         print(
             f"✅ Total tickets processed (excluding Spikes): {len([i for i in issues if i['fields'].get('issuetype', {}).get('name', '').lower() != 'spike'])}")
+        print(f"✅ Total tickets in process_status: {len(process_status['fetch_backlog']['tickets'])}")
     else:
         print(f"❌ Error: {response.status_code}")
         print(response.text)
@@ -198,12 +211,10 @@ def run_generate_test_cases():
     from dotenv import load_dotenv
     from app.db.model import SessionLocal, Ticket
     from app.logic.test_case_generator import generate_test_cases
+    from app.db.save import save_test_case
+    import uuid
     
     load_dotenv()
-    
-    # Output path
-    output_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "test_cases", "test_cases_by_ticket.md")
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     # Get all valid tickets
     session = SessionLocal()
@@ -214,60 +225,64 @@ def run_generate_test_cases():
     ).all()
     session.close()
 
-    with open(output_path, "w", encoding="utf-8") as f:
-        for idx, ticket in enumerate(tickets, 1):
-            print(f"🧪 Generating test cases for {ticket.jira_key} ({idx}/{len(tickets)})")
-            test_cases = generate_test_cases(ticket)
+    total_tickets = len(tickets)
+    tickets_processed = 0
+    total_test_cases = 0
 
-            f.write(f"## {ticket.jira_key} - {ticket.title}\n")
-            f.write(f"**Type:** {ticket.issue_type}\n\n")
+    for idx, ticket in enumerate(tickets, 1):
+        print(f"🧪 Generating test cases for {ticket.jira_key} ({idx}/{total_tickets})")
+        test_cases = generate_test_cases(ticket)
 
-            if test_cases:
-                current_block = []
-                test_case_count = 0
+        if test_cases:
+            current_block = []
+            test_case_count = 0
 
-                for line in test_cases:
-                    line = line.strip()
-                    if not line:
-                        continue
+            for line in test_cases:
+                line = line.strip()
+                if not line:
+                    continue
 
-                    current_block.append(line)
+                current_block.append(line)
 
-                    if len(current_block) == 3:
-                        scenario = action = expected = "(not detected)"
+                if len(current_block) == 3:
+                    scenario = action = expected = "(not detected)"
 
-                        for item in current_block:
-                            lower = item.lower().replace("**", "").replace("-", "").strip()
-                            if lower.startswith("scenario"):
-                                scenario = item.split(":", 1)[-1].strip()
-                            elif lower.startswith("action"):
-                                action = item.split(":", 1)[-1].strip()
-                            elif "expected behavior" in lower:
-                                expected = item.split(":", 1)[-1].strip()
+                    for item in current_block:
+                        lower = item.lower().replace("**", "").replace("-", "").strip()
+                        if lower.startswith("scenario"):
+                            scenario = item.split(":", 1)[-1].strip()
+                        elif lower.startswith("action"):
+                            action = item.split(":", 1)[-1].strip()
+                        elif "expected behavior" in lower:
+                            expected = item.split(":", 1)[-1].strip()
 
-                        test_case_count += 1
-                        f.write(f"### ✅ Test Case {test_case_count}\n")
-                        f.write(f"- **Scenario:** _{scenario}_\n")
-                        f.write(f"- **Action:** _{action}_\n")
-                        f.write(f"- **Expected behavior:** _{expected}_\n")
-                        f.write("\n---\n\n")
+                    test_case_count += 1
+                    total_test_cases += 1
+                    
+                    # Save test case to database
+                    try:
+                        save_test_case(ticket.id, scenario, action, expected)
+                        print(f"✅ Test case saved to database for ticket {ticket.jira_key}")
+                    except Exception as e:
+                        print(f"❌ Error saving test case to database: {str(e)}")
 
-                        current_block = []
+                    current_block = []
 
-                if test_case_count > 0:
-                    session = SessionLocal()
-                    db_ticket = session.query(Ticket).filter_by(jira_key=ticket.jira_key).first()
-                    if db_ticket:
-                        db_ticket.test_cases_generated = True
-                        session.commit()
-                    session.close()
-                else:
-                    f.write("_No valid test cases detected._\n\n---\n\n")
-
+            if test_case_count > 0:
+                tickets_processed += 1
+                session = SessionLocal()
+                db_ticket = session.query(Ticket).filter_by(jira_key=ticket.jira_key).first()
+                if db_ticket:
+                    db_ticket.test_cases_generated = True
+                    session.commit()
+                session.close()
+                print(f"✅ Generated {test_case_count} test cases for ticket {ticket.jira_key}")
             else:
-                f.write("_No test cases generated._\n\n---\n\n")
+                print(f"⚠️ No valid test cases detected for ticket {ticket.jira_key}")
+        else:
+            print(f"⚠️ No test cases generated for ticket {ticket.jira_key}")
 
-    print(f"✅ Test cases saved to: {output_path}")
+    print(f"✅ Test cases generation completed: {total_test_cases} test cases for {tickets_processed} tickets")
 
 # Dictionary mapping script names to their functions
 script_functions = {
@@ -282,6 +297,11 @@ def run_script(script_name):
     process_status[script_name]['output'] = []
     process_status[script_name]['start_time'] = datetime.now()
     process_status[script_name]['end_time'] = None
+    
+    # Reset tickets list for fetch_backlog
+    if script_name == 'fetch_backlog':
+        process_status[script_name]['tickets'] = []
+        print(f"Reset tickets list for {script_name}")
     
     # Create a string buffer to capture stdout
     stdout_buffer = io.StringIO()
@@ -299,6 +319,14 @@ def run_script(script_name):
         
         # Update status to completed
         process_status[script_name]['status'] = 'completed'
+        print(f"Script {script_name} completed. Status: {process_status[script_name]['status']}")
+        
+        if script_name == 'fetch_backlog':
+            print(f"Tickets in process_status after completion: {len(process_status[script_name]['tickets'])}")
+            
+            # Verify tickets were properly stored (diagnostic)
+            if not process_status[script_name]['tickets']:
+                process_status[script_name]['output'].append("⚠️ Warning: No tickets were found or added to the process status.")
         
     except Exception as e:
         # Capture the error and traceback
@@ -324,6 +352,7 @@ def run_script(script_name):
             process_status[script_name]['output'].append(line)
             
         process_status[script_name]['status'] = 'failed'
+        print(f"Script {script_name} failed. Status: {process_status[script_name]['status']}")
     
     finally:
         # Update the end time
@@ -337,7 +366,50 @@ def run_script(script_name):
 def home():
     # Check environment variables
     missing_vars = check_environment()
-    return render_template('index.html', process_status=process_status, missing_vars=missing_vars)
+    
+    # Get tickets with their test cases
+    tickets_data = []
+    from app.db.model import SessionLocal, Ticket, TestCase
+    
+    # Only show tickets from the current fetch
+    if process_status['fetch_backlog']['tickets']:
+        # Get tickets from the current fetch
+        jira_keys = [ticket['jira_key'] for ticket in process_status['fetch_backlog']['tickets']]
+        
+        # Get details and test cases for these tickets
+        session = SessionLocal()
+        tickets = session.query(Ticket).filter(Ticket.jira_key.in_(jira_keys)).all()
+        
+        for ticket in tickets:
+            # Get test cases for this ticket
+            test_cases = session.query(TestCase).filter(TestCase.ticket_id == ticket.id).all()
+            
+            ticket_data = {
+                'jira_key': ticket.jira_key,
+                'title': ticket.title,
+                'description': ticket.description,
+                'issue_type': ticket.issue_type,
+                'status': ticket.status,
+                'has_test_cases': ticket.test_cases_generated,
+                'test_cases': []
+            }
+            
+            # Add test cases if any
+            for test_case in test_cases:
+                ticket_data['test_cases'].append({
+                    'id': test_case.id,
+                    'scenario': test_case.scenario,
+                    'action': test_case.action,
+                    'expected_behavior': test_case.expected_behavior,
+                    'created_at': test_case.created_at.strftime('%Y-%m-%d %H:%M:%S') if test_case.created_at is not None else ''
+                })
+                
+            tickets_data.append(ticket_data)
+        
+        session.close()
+    
+    return render_template('index.html', process_status=process_status, missing_vars=missing_vars, 
+                           tickets_data=tickets_data)
 
 @app.route('/run/<script_name>', methods=['POST'])
 def run(script_name):
@@ -362,6 +434,23 @@ def run(script_name):
 def status(script_name):
     if script_name not in process_status:
         return jsonify({'error': 'Invalid script name'}), 400
+    
+    # For fetch_backlog, include the tickets in the response
+    if script_name == 'fetch_backlog':
+        # Add log statements to debug
+        print(f"Status endpoint for fetch_backlog called. Status: {process_status[script_name]['status']}")
+        print(f"Ticket count in process_status: {len(process_status[script_name]['tickets'])}")
+        
+        # Always include ticket data for direct UI update, regardless of status
+        response_data = {
+            'status': process_status[script_name]['status'],
+            'output': process_status[script_name]['output'],
+            'start_time': process_status[script_name]['start_time'].isoformat() if process_status[script_name]['start_time'] else None,
+            'end_time': process_status[script_name]['end_time'].isoformat() if process_status[script_name]['end_time'] else None,
+            'tickets': process_status[script_name]['tickets']
+        }
+        print(f"Returning response with {len(response_data['tickets'])} tickets")
+        return jsonify(response_data)
     
     return jsonify(process_status[script_name])
 
@@ -391,21 +480,451 @@ def stop(script_name):
 def view_output(output_type):
     if output_type == 'questions':
         file_path = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'questions', 'questions_by_ticket.md'))
+        
+        if not os.path.exists(file_path):
+            return f"Output file not found: {file_path}", 404
+        
+        with open(file_path, 'r') as f:
+            content = f.read()
+            
+        return render_template('output.html', content=content, output_type=output_type)
+    
     elif output_type == 'test_cases':
-        file_path = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'test_cases', 'test_cases_by_ticket.md'))
+        from app.db.model import SessionLocal, Ticket, TestCase
+        
+        # Get test cases from database
+        session = SessionLocal()
+        test_cases_db = session.query(Ticket, TestCase).join(TestCase, Ticket.id == TestCase.ticket_id).all()
+        session.close()
+        
+        if not test_cases_db:
+            return "No test cases found in the database.", 404
+        
+        # Create a dictionary to organize test cases by ticket
+        test_cases_by_ticket = {}
+        for ticket, test_case in test_cases_db:
+            if ticket.jira_key not in test_cases_by_ticket:
+                test_cases_by_ticket[ticket.jira_key] = {
+                    'ticket': {
+                        'jira_key': ticket.jira_key,
+                        'title': ticket.title,
+                        'issue_type': ticket.issue_type,
+                        'id': ticket.id
+                    },
+                    'test_cases': []
+                }
+            test_cases_by_ticket[ticket.jira_key]['test_cases'].append({
+                'id': test_case.id,
+                'scenario': test_case.scenario,
+                'action': test_case.action,
+                'expected_behavior': test_case.expected_behavior,
+                'created_at': test_case.created_at.strftime('%Y-%m-%d %H:%M:%S') if test_case.created_at else ''
+            })
+        
+        # Create minimal dummy content with just ticket headers - test cases will come only from db_test_cases
+        dummy_content = ""
+        for jira_key, data in test_cases_by_ticket.items():
+            dummy_content += f"## {jira_key} - {data['ticket']['title']}\n\n"
+            # No type information or test cases in dummy_content - they will be displayed from db_test_cases only
+                
+        # Pass both the dummy content and the database test cases
+        return render_template('output.html', content=dummy_content, output_type=output_type, 
+                              db_test_cases=test_cases_by_ticket)
+    
     else:
         return "Invalid output type", 400
+
+# Function to generate test cases for a single ticket
+def generate_test_cases_for_ticket(ticket_id):
+    # Check environment first
+    missing_vars = check_environment()
+    if missing_vars:
+        return {"success": False, "message": f"Missing required environment variables: {', '.join(missing_vars)}"}
     
-    if not os.path.exists(file_path):
-        return f"Output file not found: {file_path}", 404
+    # Dynamically import here to handle environment variable issues gracefully
+    from dotenv import load_dotenv
+    from app.db.model import SessionLocal, Ticket
+    from app.logic.test_case_generator import generate_test_cases
+    from app.db.save import save_test_case
     
-    with open(file_path, 'r') as f:
-        content = f.read()
+    load_dotenv()
     
-    return render_template('output.html', content=content, output_type=output_type)
+    # Get the specific ticket
+    session = SessionLocal()
+    ticket = session.query(Ticket).filter(Ticket.jira_key == ticket_id).first()
+    session.close()
+    
+    if not ticket:
+        return {"success": False, "message": f"Ticket {ticket_id} not found"}
+    
+    # Generate test cases for this ticket
+    test_cases = generate_test_cases(ticket)
+    test_case_count = 0
+    
+    if test_cases:
+        current_block = []
+        
+        for line in test_cases:
+            line = line.strip()
+            if not line:
+                continue
+                
+            current_block.append(line)
+            
+            if len(current_block) == 3:
+                scenario = action = expected = "(not detected)"
+                
+                for item in current_block:
+                    lower = item.lower().replace("**", "").replace("-", "").strip()
+                    if lower.startswith("scenario"):
+                        scenario = item.split(":", 1)[-1].strip()
+                    elif lower.startswith("action"):
+                        action = item.split(":", 1)[-1].strip()
+                    elif "expected behavior" in lower:
+                        expected = item.split(":", 1)[-1].strip()
+                        
+                test_case_count += 1
+                
+                # Save test case to database
+                try:
+                    save_test_case(ticket.id, scenario, action, expected)
+                except Exception as e:
+                    return {"success": False, "message": f"Error saving test case: {str(e)}"}
+                    
+                current_block = []
+                
+        if test_case_count > 0:
+            session = SessionLocal()
+            db_ticket = session.query(Ticket).filter_by(jira_key=ticket.jira_key).first()
+            if db_ticket:
+                # Use SQLAlchemy's update method instead of direct attribute assignment
+                db_ticket.test_cases_generated = True
+                session.commit()
+            session.close()
+            return {"success": True, "message": f"Generated {test_case_count} test cases for ticket {ticket.jira_key}", "count": test_case_count}
+        else:
+            return {"success": False, "message": f"No valid test cases detected for ticket {ticket.jira_key}"}
+    else:
+        return {"success": False, "message": f"No test cases could be generated for ticket {ticket.jira_key}"}
+
+@app.route('/generate_test_cases/<ticket_id>', methods=['POST'])
+def generate_test_cases_endpoint(ticket_id):
+    result = generate_test_cases_for_ticket(ticket_id)
+    return jsonify(result)
+
+@app.route('/get_test_cases/<ticket_id>')
+def get_test_cases(ticket_id):
+    from app.db.model import SessionLocal, Ticket, TestCase
+    
+    # Get test cases for the specified ticket
+    session = SessionLocal()
+    ticket = session.query(Ticket).filter(Ticket.jira_key == ticket_id).first()
+    
+    if not ticket:
+        return jsonify({"success": False, "message": f"Ticket {ticket_id} not found"}), 404
+    
+    test_cases = session.query(TestCase).filter(TestCase.ticket_id == ticket.id).all()
+    session.close()
+    
+    # Format test cases for the response
+    test_cases_data = []
+    for test_case in test_cases:
+        # Ensure edited is always a boolean, even if it's None in the database
+        edited = bool(test_case.edited) if test_case.edited is not None else False
+        
+        test_cases_data.append({
+            'id': test_case.id,
+            'scenario': test_case.scenario,
+            'action': test_case.action,
+            'expected_behavior': test_case.expected_behavior,
+            'created_at': test_case.created_at.strftime('%Y-%m-%d %H:%M:%S') if test_case.created_at is not None else '',
+            'edited': edited
+        })
+    
+    return jsonify({"success": True, "test_cases": test_cases_data})
+
+@app.route('/get_tickets')
+def get_tickets():
+    """Endpoint to get the current list of tickets from the fetch_backlog process status."""
+    # Get tickets with their test cases
+    tickets_data = []
+    from app.db.model import SessionLocal, Ticket, TestCase
+    
+    # Only show tickets from the current fetch
+    if process_status['fetch_backlog']['tickets']:
+        # Get tickets from the current fetch
+        jira_keys = [ticket['jira_key'] for ticket in process_status['fetch_backlog']['tickets']]
+        
+        print(f"Getting tickets for these Jira keys: {jira_keys}")
+        
+        # Get details and test cases for these tickets
+        session = SessionLocal()
+        tickets = session.query(Ticket).filter(Ticket.jira_key.in_(jira_keys)).all()
+        
+        for ticket in tickets:
+            # Get test cases for this ticket
+            test_cases = session.query(TestCase).filter(TestCase.ticket_id == ticket.id).all()
+            
+            ticket_data = {
+                'jira_key': ticket.jira_key,
+                'title': ticket.title,
+                'description': ticket.description,
+                'issue_type': ticket.issue_type,
+                'status': ticket.status,
+                'has_test_cases': ticket.test_cases_generated,
+                'test_cases': []
+            }
+            
+            # Add test cases if any
+            for test_case in test_cases:
+                ticket_data['test_cases'].append({
+                    'id': test_case.id,
+                    'scenario': test_case.scenario,
+                    'action': test_case.action,
+                    'expected_behavior': test_case.expected_behavior,
+                    'created_at': test_case.created_at.strftime('%Y-%m-%d %H:%M:%S') if test_case.created_at is not None else ''
+                })
+                
+            tickets_data.append(ticket_data)
+        
+        session.close()
+        
+        print(f"Returning {len(tickets_data)} tickets")
+    else:
+        print("No tickets in process_status['fetch_backlog']['tickets']")
+    
+    return jsonify(tickets_data)
+
+@app.route('/debug/fetch_status')
+def debug_fetch_status():
+    """Debug endpoint to check the status of the fetch_backlog process."""
+    status = process_status['fetch_backlog']['status']
+    ticket_count = len(process_status['fetch_backlog']['tickets'])
+    
+    # Return detailed information for debugging
+    return jsonify({
+        'status': status,
+        'ticket_count': ticket_count,
+        'tickets': process_status['fetch_backlog']['tickets']
+    })
+
+@app.route('/debug/raw_process_status')
+def debug_raw_process_status():
+    """Debug endpoint to return the raw process_status dictionary."""
+    return jsonify(process_status)
+
+@app.route('/update_test_case/<test_case_id>', methods=['POST'])
+def update_test_case(test_case_id):
+    """Endpoint to update a test case with new values."""
+    from app.db.model import SessionLocal, TestCase
+    from sqlalchemy.orm.exc import DetachedInstanceError
+    from sqlalchemy.orm import make_transient_to_detached
+    
+    data = request.json
+    if not data:
+        return jsonify({"success": False, "message": "No data provided"}), 400
+    
+    # Get required fields from request
+    scenario = data.get('scenario')
+    action = data.get('action')
+    expected_behavior = data.get('expected_behavior')
+    
+    # Validate required fields
+    if not all([scenario, action, expected_behavior]):
+        return jsonify({"success": False, "message": "Missing required fields"}), 400
+    
+    session = SessionLocal()
+    
+    try:
+        # Get the test case by ID
+        test_case = session.query(TestCase).get(test_case_id)
+        
+        if not test_case:
+            session.close()
+            return jsonify({"success": False, "message": f"Test case {test_case_id} not found"}), 404
+        
+        # Update attributes
+        test_case.scenario = scenario
+        test_case.action = action
+        test_case.expected_behavior = expected_behavior
+        test_case.edited = True  # Set the edited flag
+        
+        # Explicitly merge and commit (using merge instead of add to handle detached instances)
+        session.merge(test_case)
+        session.commit()
+        session.refresh(test_case)  # Refresh to ensure we have the latest data
+        
+        # Get the updated data
+        updated_test_case = {
+            "id": test_case.id,
+            "scenario": test_case.scenario,
+            "action": test_case.action,
+            "expected_behavior": test_case.expected_behavior,
+            "edited": test_case.edited
+        }
+        
+        session.close()
+        
+        return jsonify({
+            "success": True, 
+            "message": "Test case updated successfully",
+            "test_case": updated_test_case
+        })
+    except Exception as e:
+        import traceback
+        print(f"Error updating test case: {str(e)}")
+        print(traceback.format_exc())
+        session.rollback()
+        session.close()
+        return jsonify({"success": False, "message": f"Error updating test case: {str(e)}"}), 500
+
+@app.route('/send_to_jira/<ticket_id>', methods=['POST'])
+def send_to_jira(ticket_id):
+    """Send test cases as a comment to the corresponding Jira ticket."""
+    from app.db.model import SessionLocal, Ticket, TestCase
+    import requests
+    import json
+    from datetime import datetime
+    
+    app.logger.info(f"Received request to send test cases for ticket {ticket_id} to Jira")
+
+    # Get Jira configuration
+    JIRA_BASE_URL = os.getenv("JIRA_BASE_URL", "")
+    JIRA_USER = os.getenv("JIRA_USER", "")
+    JIRA_API_TOKEN = os.getenv("JIRA_API_TOKEN", "")
+
+    if not JIRA_BASE_URL or not JIRA_USER or not JIRA_API_TOKEN:
+        app.logger.error("Missing Jira configuration")
+        return jsonify({
+            "success": False,
+            "message": "Missing Jira configuration. Please set JIRA_BASE_URL, JIRA_USER, and JIRA_API_TOKEN in .env"
+        }), 400
+
+    if not JIRA_BASE_URL or not JIRA_USER or not JIRA_API_TOKEN:
+        return jsonify({
+            "success": False,
+            "message": "Missing Jira configuration. Please set JIRA_BASE_URL, JIRA_USER, and JIRA_API_TOKEN in .env"
+        }), 400
+
+    # Get the ticket and its test cases
+    session = SessionLocal()
+    try:
+        ticket = session.query(Ticket).filter(Ticket.jira_key == ticket_id).first()
+        
+        if not ticket:
+            app.logger.error(f"Ticket {ticket_id} not found")
+            session.close()
+            return jsonify({"success": False, "message": f"Ticket {ticket_id} not found"}), 404
+        
+        app.logger.info(f"Found ticket {ticket_id} in database")
+        test_cases = session.query(TestCase).filter(TestCase.ticket_id == ticket.id).all()
+        
+        if not test_cases:
+            app.logger.error(f"No test cases found for ticket {ticket_id}")
+            session.close()
+            return jsonify({"success": False, "message": f"No test cases found for ticket {ticket_id}"}), 404
+        
+        app.logger.info(f"Found {len(test_cases)} test cases for ticket {ticket_id}")
+        
+        # Format test cases as a comment
+        comment_body = f"*Test Cases for {ticket_id}*\n\n"
+        for i, test_case in enumerate(test_cases, 1):
+            edited_mark = " (Edited)" if test_case.edited is True else ""
+            comment_body += f"*Test Case {i}{edited_mark}*\n"
+            comment_body += f"*Scenario:* {test_case.scenario}\n"
+            comment_body += f"*Action:* {test_case.action}\n"
+            comment_body += f"*Expected Behavior:* {test_case.expected_behavior}\n\n"
+        
+        comment_body += f"\n_Generated by TestCasesGenerator on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_"
+        app.logger.info(f"Formatted comment body for Jira")
+        
+        # Create Jira comment
+        url = f"{JIRA_BASE_URL}/rest/api/3/issue/{ticket_id}/comment"
+        app.logger.info(f"Sending request to Jira API: {url}")
+        
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        auth = (JIRA_USER, JIRA_API_TOKEN)
+        
+        # Format as Atlassian Document Format for better formatting in Jira
+        payload = {
+            "body": {
+                "type": "doc",
+                "version": 1,
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": comment_body
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+        
+        response = requests.post(url, headers=headers, json=payload, auth=auth)
+        app.logger.info(f"Jira API response status: {response.status_code}")
+        
+        if response.status_code in [200, 201]:
+            app.logger.info(f"Successfully posted test cases to Jira ticket {ticket_id}")
+            # Update the ticket in the database
+            setattr(ticket, 'posted_to_jira', True)
+            session.commit()
+            
+            session.close()
+            return jsonify({
+                "success": True,
+                "message": f"Test cases successfully posted to Jira ticket {ticket_id}"
+            })
+        else:
+            app.logger.error(f"Error posting to Jira: {response.status_code} - {response.text}")
+            session.close()
+            return jsonify({
+                "success": False,
+                "message": f"Error posting to Jira: {response.status_code} - {response.text}"
+            }), 500
+        
+    except Exception as e:
+        app.logger.exception(f"Error sending test cases to Jira: {str(e)}")
+        session.rollback()
+        session.close()
+        return jsonify({
+            "success": False,
+            "message": f"Error sending test cases to Jira: {str(e)}"
+        }), 500
+
+@app.route('/jira_button/<ticket_id>', methods=['GET'])
+def jira_button_action(ticket_id):
+    """Alternative endpoint for the Send to Jira button - works without JavaScript."""
+    app.logger.info(f"Direct button action for ticket {ticket_id}")
+
+    try:
+        # Call the existing send_to_jira function to send to Jira
+        response = send_to_jira(ticket_id)
+        
+        # Get data from the response
+        if isinstance(response, tuple):
+            data, status_code = response
+        else:
+            data = response
+            status_code = 200
+            
+        # Flash success or error message here if needed
+        app.logger.info(f"Jira button action completed with status: {status_code}")
+        
+    except Exception as e:
+        app.logger.exception(f"Error in jira_button_action: {str(e)}")
+    
+    # Always redirect back to the main page with the ticket anchor
+    return redirect(url_for('index', _anchor=f"ticket-{ticket_id}"))
 
 def start():
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5002)
 
 if __name__ == '__main__':
     start()

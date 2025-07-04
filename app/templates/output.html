@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
+        /* Collapsible styles - ONLY for tickets, test cases are always visible */
         .collapsible {
             background-color: var(--light-color);
             color: var(--dark-color);
@@ -70,7 +71,7 @@
             margin: 15px 0;
             border-radius: 5px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            display: block; /* Ensure test cases are always visible */
+            display: block; /* Test cases are always visible */
         }
         
         .test-case h3 {
@@ -79,7 +80,7 @@
         }
         
         .test-case-content {
-            display: block; /* Ensure test case content is always visible */
+            display: block; /* Test case content is always visible */
             padding: 5px 0;
         }
         
@@ -94,18 +95,19 @@
         
         /* Make sure expanded tickets show all content */
         .active + .collapsible-content {
-            height: auto;
-            overflow: visible;
+            height: auto !important;
+            overflow: visible !important;
+            padding: 18px !important;
         }
         
-        /* Show ticket content immediately when expanded */
+        /* Ticket content is always visible when expanded */
         .active + .collapsible-content .test-case {
-            display: block;
+            display: block !important;
         }
         
         /* Fix for Safari and other browsers */
         .collapsible-content[style*="max-height"] {
-            overflow: visible;
+            overflow: visible !important;
         }
     </style>
 </head>
@@ -134,7 +136,7 @@
             const outputType = "{{ output_type }}";
             
             if (outputType === 'test_cases') {
-                // For test cases, create collapsible tickets with their test cases
+                // For test cases, create collapsible tickets with their always-visible test cases
                 createTicketsWithTestCases(content);
             } else {
                 // For other types, just render markdown
@@ -153,6 +155,11 @@
             const ticketSections = markdownContent.split(/(?=## )/);
             console.log('Found ' + ticketSections.length + ' ticket sections');
             
+            {% if output_type == 'test_cases' and db_test_cases %}
+            // Log available database test cases for debugging
+            console.log('Database test cases available:', {{ db_test_cases.keys()|list|tojson }});
+            {% endif %}
+            
             ticketSections.forEach((section, index) => {
                 if (!section.trim()) return; // Skip empty sections
                 
@@ -161,76 +168,118 @@
                 if (!headerMatch) return;
                 
                 const headerText = headerMatch[1];
+                const ticketIdMatch = headerText.match(/^([A-Z]+-\d+)/);
+                const ticketId = ticketIdMatch ? ticketIdMatch[1] : null;
                 const typeMatch = section.match(/\*\*Type:\*\* (.+?)\n/);
                 const ticketType = typeMatch ? typeMatch[1] : '';
                 
-                console.log('Processing ticket: ' + headerText);
+                console.log('Processing ticket: ' + headerText + (ticketId ? ' (ID: ' + ticketId + ')' : ''));
                 
                 // Create ticket container
                 const ticketContainer = document.createElement('div');
                 ticketContainer.className = 'ticket-container';
                 ticketContainer.id = 'ticket-' + index;
                 
-                // Create collapsible button for ticket
+                // Create collapsible button for ticket (only tickets are collapsible)
                 const button = document.createElement('button');
                 button.className = 'collapsible';
                 button.textContent = headerText;
                 
-                // Add ticket type span if available
-                if (ticketType) {
-                    const typeSpan = document.createElement('span');
-                    typeSpan.className = 'ticket-type';
-                    typeSpan.textContent = ticketType;
-                    button.appendChild(typeSpan);
-                }
+                // We don't want to show the ticket type (e.g. "story") in the header anymore
+                // Removed the ticket type span
                 
                 // Create content div for the ticket
                 const contentDiv = document.createElement('div');
                 contentDiv.className = 'collapsible-content';
                 contentDiv.id = 'content-' + index;
                 
-                // Extract test cases
-                // First, get the content after the ticket header and type
-                let contentText = section;
-                contentText = contentText.replace(/## .+?\n/, ''); // Remove the main header
-                contentText = contentText.replace(/\*\*Type:\*\* .+?\n\n/, ''); // Remove the type line
-                
-                // Check if there are test cases
-                if (contentText.includes('### ✅ Test Case')) {
-                    // Split test cases and process each one
-                    const testCases = contentText.split(/(?=### ✅ Test Case)/);
-                    console.log('Found ' + testCases.length + ' test cases for ticket: ' + headerText);
+                // Check for database test cases for this ticket
+                let useDbTestCases = false;
+                {% if output_type == 'test_cases' and db_test_cases %}
+                if (ticketId && {{ db_test_cases|tojson }}.hasOwnProperty(ticketId)) {
+                    useDbTestCases = true;
+                    const dbCases = {{ db_test_cases|tojson }}[ticketId].test_cases;
+                    console.log(`Using ${dbCases.length} database test cases for ticket ${ticketId}`);
                     
-                    testCases.forEach((testCase, tcIndex) => {
-                        if (!testCase.trim()) return;
-                        
+                    // Create test cases from database
+                    dbCases.forEach((testCase, tcIndex) => {
                         const testCaseElement = document.createElement('div');
                         testCaseElement.className = 'test-case';
                         testCaseElement.id = 'test-case-' + index + '-' + tcIndex;
                         
-                        // Extract the test case title for better formatting
-                        const titleMatch = testCase.match(/### (✅ Test Case \d+)/);
-                        if (titleMatch) {
-                            const title = document.createElement('h3');
-                            title.textContent = titleMatch[1];
-                            testCaseElement.appendChild(title);
-                            
-                            // Format the rest of the content
-                            const content = testCase.replace(/### ✅ Test Case \d+\n/, '');
-                            const contentEl = document.createElement('div');
-                            contentEl.className = 'test-case-content';
-                            contentEl.innerHTML = marked.parse(content);
-                            testCaseElement.appendChild(contentEl);
-                        } else {
-                            testCaseElement.innerHTML = marked.parse(testCase);
-                        }
+                        // Create test case title
+                        const title = document.createElement('h3');
+                        title.textContent = `✅ Test Case ${tcIndex + 1}`;
+                        testCaseElement.appendChild(title);
                         
+                        // Create test case content
+                        const contentEl = document.createElement('div');
+                        contentEl.className = 'test-case-content';
+                        
+                        // Add test case details
+                        const scenarioP = document.createElement('p');
+                        scenarioP.innerHTML = `<strong>Scenario:</strong> <em>${testCase.scenario}</em>`;
+                        contentEl.appendChild(scenarioP);
+                        
+                        const actionP = document.createElement('p');
+                        actionP.innerHTML = `<strong>Action:</strong> <em>${testCase.action}</em>`;
+                        contentEl.appendChild(actionP);
+                        
+                        const expectedP = document.createElement('p');
+                        expectedP.innerHTML = `<strong>Expected behavior:</strong> <em>${testCase.expected_behavior}</em>`;
+                        contentEl.appendChild(expectedP);
+                        
+                        testCaseElement.appendChild(contentEl);
                         contentDiv.appendChild(testCaseElement);
                     });
-                } else {
-                    // No test cases or unstructured content
-                    console.log('No test cases found for ticket: ' + headerText);
-                    contentDiv.innerHTML = marked.parse(contentText);
+                }
+                {% endif %}
+                
+                // If no database test cases found or not using database, extract from markdown
+                if (!useDbTestCases) {
+                    // Extract test cases from markdown
+                    // First, get the content after the ticket header and type
+                    let contentText = section;
+                    contentText = contentText.replace(/## .+?\n/, ''); // Remove the main header
+                    contentText = contentText.replace(/\*\*Type:\*\* .+?\n\n/, ''); // Remove the type line
+                
+                    // Check if there are test cases
+                    if (contentText.includes('### ✅ Test Case')) {
+                        // Split test cases and process each one
+                        const testCases = contentText.split(/(?=### ✅ Test Case)/);
+                        console.log('Found ' + testCases.length + ' test cases for ticket: ' + headerText);
+                        
+                        testCases.forEach((testCase, tcIndex) => {
+                            if (!testCase.trim()) return;
+                            
+                            const testCaseElement = document.createElement('div');
+                            testCaseElement.className = 'test-case';
+                            testCaseElement.id = 'test-case-' + index + '-' + tcIndex;
+                            
+                            // Extract the test case title for better formatting
+                            const titleMatch = testCase.match(/### (✅ Test Case \d+)/);
+                            if (titleMatch) {
+                                const title = document.createElement('h3');
+                                title.textContent = titleMatch[1];
+                                testCaseElement.appendChild(title);
+                                
+                                // Format the rest of the content
+                                const content = testCase.replace(/### ✅ Test Case \d+\n/, '');
+                                const contentEl = document.createElement('div');
+                                contentEl.className = 'test-case-content';
+                                contentEl.innerHTML = marked.parse(content);
+                                testCaseElement.appendChild(contentEl);
+                            } else {
+                                testCaseElement.innerHTML = marked.parse(testCase);
+                            }
+                            
+                            contentDiv.appendChild(testCaseElement);
+                        });
+                    } else {
+                        // No test cases or unstructured content
+                        console.log('No test cases found for ticket: ' + headerText);
+                        contentDiv.innerHTML = marked.parse(contentText);
+                    }
                 }
                 
                 // Add to container
@@ -248,17 +297,9 @@
                         content.style.maxHeight = null;
                     } else {
                         console.log('Expanding ticket: ' + headerText);
-                        // Calculate the full height including all test cases
-                        content.style.maxHeight = 'none'; // Temporarily set to none to get full height
-                        const scrollHeight = content.scrollHeight;
-                        content.style.maxHeight = '0px'; // Reset to trigger animation
-                        
-                        // Force reflow
-                        content.offsetHeight;
-                        
-                        // Set to actual height + buffer for any dynamic content
-                        content.style.maxHeight = scrollHeight + 500 + 'px';
-                        console.log('Set height to: ' + (scrollHeight + 500) + 'px');
+                        // Set to a large value to ensure all content is visible
+                        content.style.maxHeight = '10000px';
+                        console.log('Set max height to show all test cases');
                     }
                 });
             });

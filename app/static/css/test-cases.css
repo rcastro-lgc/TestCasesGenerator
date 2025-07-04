@@ -1,0 +1,106 @@
+/* Test Cases Section Styles */
+.test-cases-section {
+    margin-top: 40px;
+    background-color: var(--card-color);
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+}
+
+.test-cases-section h2 {
+    color: var(--primary-color);
+    margin-bottom: 20px;
+    text-align: center;
+    font-size: 24px;
+}
+
+.test-cases-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+/* Collapsible styles for ticket headers */
+.ticket-container {
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.collapsible {
+    background-color: var(--light-color);
+    color: var(--dark-color);
+    cursor: pointer;
+    padding: 18px;
+    width: 100%;
+    border: none;
+    text-align: left;
+    outline: none;
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 2px;
+    border-radius: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.3s;
+}
+
+.active, .collapsible:hover {
+    background-color: var(--border-color);
+}
+
+.collapsible:after {
+    content: '+';
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.active:after {
+    content: '-';
+}
+
+.collapsible-content {
+    padding: 0 18px;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease-out;
+    background-color: var(--card-color);
+    border-radius: 0 0 5px 5px;
+}
+
+/* Test case styles */
+.test-case {
+    background-color: var(--card-color);
+    border-left: 4px solid var(--primary-color);
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: block;
+}
+
+.test-case h3 {
+    margin-top: 0;
+    color: var(--primary-color);
+}
+
+.test-case-content {
+    display: block;
+    padding: 5px 0;
+}
+
+.test-case p {
+    margin-bottom: 10px;
+}
+
+/* Make sure expanded tickets show all content */
+.active + .collapsible-content {
+    height: auto !important;
+    overflow: visible !important;
+    padding: 18px !important;
+}
+
+/* Fix for Safari and other browsers */
+.collapsible-content[style*="max-height"] {
+    overflow: visible !important;
+}
