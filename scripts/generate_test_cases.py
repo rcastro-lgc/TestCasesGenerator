@@ -45,7 +45,7 @@ for idx, ticket in enumerate(tickets, 1):
 
                 test_case_count += 1
                 total_test_cases += 1
-                
+
                 # Save test case to database
                 try:
                     save_test_case(ticket.id, scenario, action, expected)
@@ -59,10 +59,13 @@ for idx, ticket in enumerate(tickets, 1):
             tickets_processed += 1
             session = SessionLocal()
             db_ticket = session.query(Ticket).filter_by(jira_key=ticket.jira_key).first()
-            db_ticket.test_cases_generated = True
-            session.commit()
+            if db_ticket is not None:
+                setattr(db_ticket, "test_cases_generated", True)  # Set the instance attribute, not the Column object
+                session.commit()
+                print(f"✅ Generated {test_case_count} test cases for ticket {ticket.jira_key}")
+            else:
+                print(f"❌ Ticket with jira_key {ticket.jira_key} not found in database.")
             session.close()
-            print(f"✅ Generated {test_case_count} test cases for ticket {ticket.jira_key}")
         else:
             print(f"⚠️ No valid test cases detected for ticket {ticket.jira_key}")
     else:

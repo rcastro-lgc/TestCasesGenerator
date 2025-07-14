@@ -18,7 +18,7 @@ with open(output_path, "w", encoding="utf-8") as f:
         print(f"🔄 Generating questions for {ticket.jira_key} ({idx+1}/{len(tickets)})")
         questions = generate_questions(ticket)
 
-        f.write(f"## {ticket.jira_key} - {ticket.title.strip() if ticket.title else ''}\n")
+        f.write(f"## {ticket.jira_key} - {ticket.title.strip() if ticket.title is not None else ''}\n")
         f.write(f"**Type:** {ticket.issue_type}\n\n")
 
         if questions:
@@ -26,7 +26,7 @@ with open(output_path, "w", encoding="utf-8") as f:
             for q in questions:
                 f.write(f"- {q}\n")
             # Mark ticket as processed
-            ticket.questions_generated = True
+            setattr(ticket, "questions_generated", True)  # Set the instance attribute, not the Column object
             session.add(ticket)
         else:
             f.write("_No questions generated._\n")

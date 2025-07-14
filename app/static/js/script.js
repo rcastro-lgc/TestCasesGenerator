@@ -30,33 +30,79 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add event listeners to all run buttons
     scripts.forEach(script => {
         // Run button
-        script.runButton.addEventListener('click', function() {
-            runScript(script.name);
-        });
+        if (script.runButton) {
+            script.runButton.addEventListener('click', function() {
+                runScript(script.name);
+            });
+        }
 
         // Stop button
-        script.stopButton.addEventListener('click', function() {
-            stopScript(script.name);
-        });
+        if (script.stopButton) {
+            script.stopButton.addEventListener('click', function() {
+                stopScript(script.name);
+            });
+        }
     });
 
     // Function to run a script
     function runScript(scriptName) {
-        fetch(`/run/${scriptName}`, {
-            method: 'POST'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                console.error('Error:', data.error);
-            } else {
-                // Start polling for status
-                startPolling(scriptName);
+        // If it's fetch_backlog, validate the jira filter
+        if (scriptName === 'fetch_backlog') {
+            const jiraFilterInput = document.getElementById('jira-filter');
+            if (!jiraFilterInput) {
+                alert('Error: Could not find Jira filter input element');
+                return;
             }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-        });
+            
+            const jiraFilter = jiraFilterInput.value.trim();
+            
+            if (!jiraFilter) {
+                alert('Please enter a JQL filter in the Jira Filter field');
+                jiraFilterInput.focus();
+                return;
+            }
+            
+            const options = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ jira_filter: jiraFilter })
+            };
+            
+            fetch(`/run/${scriptName}`, options)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('Error:', data.error);
+                    alert('Error: ' + data.error);
+                } else {
+                    // Start polling for status
+                    startPolling(scriptName);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error: ' + error);
+            });
+        } else {
+            // For other scripts
+            fetch(`/run/${scriptName}`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('Error:', data.error);
+                } else {
+                    // Start polling for status
+                    startPolling(scriptName);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
     }
 
     // Function to stop a script
@@ -85,11 +131,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(response => response.json())
                 .then(data => {
                     updateScriptStatus(scriptName, data);
-                    
+
                     // If script is not running anymore, stop polling
                     if (data.status !== 'running') {
                         clearInterval(intervalId);
-                        
+
                         // Refresh page to show view buttons if completed
                         if (data.status === 'completed') {
                             setTimeout(() => {
@@ -104,6 +150,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
         }, 1000);
     }
+    
+    // Expose startPolling globally for legacy compatibility
+    window.startPolling = startPolling;
 
     // Function to update the UI for a script
     function updateScriptStatus(scriptName, data) {

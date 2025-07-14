@@ -9,7 +9,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/test-cases.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tickets-table.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/new-ui.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/button-fix-clean.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/jira-filter.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/buttons.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
@@ -44,10 +45,10 @@ JIRA_BASE_URL=https://your-organization.atlassian.net
 JIRA_USER=your-jira-email@example.com
 JIRA_API_TOKEN=your-jira-api-token
 
-# Project/Sprint Configuration (uncomment and set one of these options)
+# Project/Sprint Configuration (used as fallback only)
 JIRA_PROJECT=YOUR_PROJECT_KEY
 JIRA_SPRINT="Your Sprint Name"
-# JIRA_JQL=project = YOUR_PROJECT AND Sprint = "Your Sprint Name" ORDER BY updated DESC
+# Note: JQL filters are now specified directly in the UI
 
 # Optional Model Configuration
 MODEL_QUESTIONS=gemini-1.5-pro
@@ -62,12 +63,22 @@ MODEL_TESTCASES=gemini-1.5-flash</code></pre>
             <div class="section" id="fetch-backlog-section">
                 <div class="section-header">
                     <h2>📥 Fetch Backlog</h2>
-                    <button id="run-fetch-backlog" class="run-button" {% if missing_vars %}disabled{% endif %}>Fetch Tickets</button>
+                    <div class="button-group">
+                        <button id="run-fetch-backlog" class="run-button" {% if missing_vars %}disabled{% endif %}>Fetch Tickets</button>
+                        <button id="stop-fetch-backlog" class="stop-button" disabled>Stop</button>
+                    </div>
                 </div>
                 
                 <div class="section-status">
                     <span class="status-label">Status:</span>
                     <span class="status-value" id="fetch-backlog-status">{{ process_status['fetch_backlog']['status'] }}</span>
+                </div>
+                
+                <!-- Add Jira Filter input field -->
+                <div class="jira-filter-container">
+                    <label for="jira-filter">Jira Filter: <span class="required">*Required</span></label>
+                    <input type="text" id="jira-filter" class="form-control" placeholder="Enter JQL filter to fetch tickets" required>
+                    <small class="form-text text-muted">Example: project = SCRUM AND Sprint = "TestSprint1" ORDER BY updated DESC</small>
                 </div>
                 
                 <div class="output-area" id="fetch-backlog-output-area">
@@ -278,19 +289,9 @@ MODEL_TESTCASES=gemini-1.5-flash</code></pre>
                                     // First, set the HTML content without the button
                                     testCasesEl.innerHTML = html;
                                     
-                                    // Then create and add the Send to Jira button as a separate DOM element
-                                    const jiraContainer = document.createElement('div');
-                                    jiraContainer.className = 'send-to-jira-container';
-                                    
-                                    const jiraButton = document.createElement('button');
-                                    jiraButton.className = 'send-to-jira-btn';
-                                    jiraButton.textContent = 'Send Test Cases to Jira';
-                                    jiraButton.onclick = function() { sendToJira(ticketId); };
-                                    
-                                    jiraContainer.appendChild(jiraButton);
-                                    testCasesEl.appendChild(jiraContainer);
-                                    
-                                    console.log("Added Send to Jira button for ticket", ticketId);
+                                    // No longer adding the default Send to Jira button here
+                                    // We will only use the DIAGNOSTIC Send to Jira button
+                                    console.log("Default Send to Jira button disabled, using DIAGNOSTIC button only");
                         } else {
                             testCasesEl.innerHTML = '<p class="no-test-cases">No test cases found.</p>';
                         }
@@ -373,25 +374,9 @@ MODEL_TESTCASES=gemini-1.5-flash</code></pre>
                                     // First, set the HTML content without the button
                                     testCasesEl.innerHTML = html;
                                     
-                                    // Then create and add the Send to Jira button as a separate DOM element
-                                    const jiraContainer = document.createElement('div');
-                                    jiraContainer.className = 'send-to-jira-container';
-                                    
-                                    const jiraButton = document.createElement('button');
-                                    jiraButton.id = `send-to-jira-btn-main-${ticketId}`;
-                                    jiraButton.className = 'send-to-jira-btn';
-                                    jiraButton.textContent = 'Send Test Cases to Jira';
-                                    
-                                    // Use addEventListener for better event handling
-                                    jiraButton.addEventListener('click', function() {
-                                        console.log(`Main Jira button clicked for ticket ${ticketId}`);
-                                        sendToJira(ticketId);
-                                    });
-                                    
-                                    jiraContainer.appendChild(jiraButton);
-                                    testCasesEl.appendChild(jiraContainer);
-                                    
-                                    console.log("Added Send to Jira button for ticket", ticketId);
+                                    // No longer adding the default Send to Jira button here
+                                    // We will only use the DIAGNOSTIC Send to Jira button
+                                    console.log("Default Send to Jira button disabled, using DIAGNOSTIC button only");
                                     
                                     // Update the generate button to show badge
                                     const actionsEl = document.querySelector('#ticket-' + ticketId + ' .ticket-actions');
@@ -538,69 +523,18 @@ MODEL_TESTCASES=gemini-1.5-flash</code></pre>
         
         // Send test cases to Jira
         function sendToJira(ticketId) {
-            debugLog(`sendToJira called for ticket: ${ticketId}`);
+            console.log(`🚨 sendToJira called for ticket: ${ticketId}`);
             
-            // Use the clean implementation in button-fix-clean.js
+            // Use the diagnostic version
             if (window.sendToJiraAPI) {
+                console.log("🚨 Using diagnostic sendToJiraAPI function");
                 window.sendToJiraAPI(ticketId);
             } else {
-                debugLog("❌ sendToJiraAPI function not found, falling back to default implementation");
-                
-                // Make API request directly
-                fetch(`/send_to_jira/${ticketId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        debugLog("✅ Successfully sent to Jira");
-                        alert("Successfully sent test cases to Jira!");
-                    } else {
-                        debugLog("❌ Error from server:", data.message);
-                        alert('Error: ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    debugLog('❌ Error sending to Jira:', error);
-                    alert('Error sending test cases to Jira. Please try again.');
-                });
+                // Should never get here since diagnostic is always loaded
+                console.error("🚨 Error: diagnostic sendToJiraAPI function not found");
+                alert(`Error: diagnostic sendToJiraAPI function not found. This should not happen.`);
             }
         }
-        
-        // Fetch backlog
-        document.getElementById('run-fetch-backlog').addEventListener('click', function() {
-            this.disabled = true;
-            this.textContent = 'Fetching...';
-            
-            const statusEl = document.getElementById('fetch-backlog-status');
-            statusEl.textContent = 'running';
-            
-            const outputEl = document.getElementById('fetch-backlog-output');
-            outputEl.innerHTML = '<div>Fetching tickets from Jira...</div>';
-            
-            fetch('/run/fetch_backlog', { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'started') {
-                        pollFetchStatus();
-                    } else {
-                        statusEl.textContent = 'failed';
-                        this.disabled = false;
-                        this.textContent = 'Fetch Tickets';
-                        showError('Failed to start fetch process');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching backlog:', error);
-                    statusEl.textContent = 'failed';
-                    this.disabled = false;
-                    this.textContent = 'Fetch Tickets';
-                    showError(`Error starting fetch: ${error.message}`);
-                });
-        });
         
         // Function to show error message in the UI
         function showError(message) {
@@ -622,271 +556,22 @@ MODEL_TESTCASES=gemini-1.5-flash</code></pre>
             }, 10000);
         }
         
-        // New function specifically for polling fetch_backlog status
-        function pollFetchStatus() {
-            console.log('Polling fetch_backlog status...');
-            
-            fetch('/status/fetch_backlog')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! Status: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Fetch status:', data.status, 'Ticket count:', data.tickets ? data.tickets.length : 0);
-                    
-                    // Update status display
-                    const statusEl = document.getElementById('fetch-backlog-status');
-                    statusEl.textContent = data.status;
-                    
-                    // Update output display
-                    const outputEl = document.getElementById('fetch-backlog-output');
-                    outputEl.innerHTML = '';
-                    
-                    if (data.output && Array.isArray(data.output)) {
-                        data.output.forEach(line => {
-                            const div = document.createElement('div');
-                            div.textContent = line;
-                            outputEl.appendChild(div);
-                        });
-                        // Scroll to bottom
-                        outputEl.scrollTop = outputEl.scrollHeight;
-                    }
-                    
-                    // If completed and we have tickets, update the tickets display
-                    if (data.status === 'completed') {
-                        if (data.tickets && data.tickets.length > 0) {
-                            console.log('Fetch completed with', data.tickets.length, 'tickets - updating display');
-                            updateTicketsDisplay(data.tickets);
-                        } else {
-                            console.warn('Fetch completed but no tickets found in response');
-                            showError('Fetch completed but no tickets were found. Check the output for details.');
-                        }
-                    }
-                    
-                    // Continue polling if still running
-                    if (data.status === 'running') {
-                        setTimeout(pollFetchStatus, 1000);
-                    } else {
-                        // Re-enable the run button
-                        const button = document.getElementById('run-fetch-backlog');
-                        button.disabled = false;
-                        button.textContent = 'Fetch Tickets';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error polling fetch status:', error);
-                    showError(`Error checking fetch status: ${error.message}`);
-                    setTimeout(pollFetchStatus, 2000); // Longer delay on error
-                });
-        }
-        
-        // New function to update the tickets display
-        function updateTicketsDisplay(tickets) {
-            console.log('Updating tickets display with', tickets.length, 'tickets');
-            
-            const ticketsSection = document.getElementById('tickets-section');
-            const ticketsList = ticketsSection.querySelector('.tickets-list');
-            
-            // Create HTML from ticket data
-            if (tickets && tickets.length > 0) {
-                let html = '';
-                tickets.forEach(ticket => {                    html += `
-                    <div class="ticket-item" id="ticket-${ticket.jira_key}">
-                        <div class="ticket-header" onclick="expandTicket('${ticket.jira_key}')">
-                            <div class="ticket-title">
-                                <h3>${ticket.jira_key} - ${ticket.title}</h3>
-                                <span class="ticket-type">${ticket.issue_type}</span>
-                                <span class="ticket-status">${ticket.status}</span>
-                            </div>
-                            <div class="ticket-actions" onclick="event.stopPropagation();">
-                                <button class="generate-button" onclick="generateTestCases('${ticket.jira_key}')">Generate Test Cases</button>
-                            </div>
-                        </div>
-                        
-                        <div class="ticket-details" id="details-${ticket.jira_key}" style="display: none;">
-                            <div class="ticket-description">
-                                <h4>Description</h4>
-                                <div class="description-content" id="description-${ticket.jira_key}">Loading...</div>
-                            </div>
-                            <div class="ticket-test-cases" id="test-cases-${ticket.jira_key}">
-                                <p class="no-test-cases">No test cases generated yet.</p>
-                            </div>
-                        </div>
-                    </div>
-                    `;
-                });
-                
-                ticketsList.innerHTML = html;
-                
-                // After updating the DOM, fetch the full ticket details including descriptions
-                fetch('/get_tickets')
-                    .then(response => response.json())
-                    .then(fullTickets => {
-                        console.log('Retrieved full ticket details:', fullTickets.length);
-                        updateTicketsWithData(fullTickets);
-                    })
-                    .catch(error => {
-                        console.error('Error fetching full ticket details:', error);
-                    });
-            } else {
-                ticketsList.innerHTML = '<p class="no-tickets">No tickets found.</p>';
-            }
-        }
-        
-        // New function to update tickets with full data including descriptions
-        function updateTicketsWithData(tickets) {
-            if (!tickets || !tickets.length) return;
-            
-            tickets.forEach(ticket => {
-                // Update description if available
-                const descriptionEl = document.getElementById(`description-${ticket.jira_key}`);
-                if (descriptionEl && ticket.description) {
-                    descriptionEl.textContent = ticket.description;
-                }
-                
-                // Update test cases if available
-                if (ticket.test_cases && ticket.test_cases.length > 0) {
-                    const testCasesEl = document.getElementById(`test-cases-${ticket.jira_key}`);
-                    if (testCasesEl) {
-                        let html = '<h4>Test Cases</h4>';
-                        ticket.test_cases.forEach((testCase, index) => {
-                            html += `
-                                <div class="test-case" id="test-case-${testCase.id}">
-                                    <div class="test-case-view">
-                                        <div class="test-case-header">
-                                            <h5>Test Case ${index + 1}</h5>
-                                            <button class="edit-test-case-btn" onclick="editTestCase('${testCase.id}')">✏️ Edit</button>
-                                        </div>
-                                        <p><strong>Scenario:</strong> <em>${testCase.scenario}</em></p>
-                                        <p><strong>Action:</strong> <em>${testCase.action}</em></p>
-                                        <p><strong>Expected behavior:</strong> <em>${testCase.expected_behavior}</em></p>
-                                    </div>
-                                    <div class="test-case-edit" style="display: none;">
-                                        <div class="test-case-header">
-                                            <h5>Edit Test Case ${index + 1}</h5>
-                                            <div>
-                                                <button class="cancel-edit-btn" onclick="cancelEditTestCase('${testCase.id}')">Cancel</button>
-                                                <button class="save-test-case-btn" onclick="saveTestCase('${testCase.id}')">Save</button>
-                                            </div>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="scenario-${testCase.id}">Scenario:</label>
-                                            <textarea id="scenario-${testCase.id}" class="form-control">${testCase.scenario}</textarea>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="action-${testCase.id}">Action:</label>
-                                            <textarea id="action-${testCase.id}" class="form-control">${testCase.action}</textarea>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="expected-${testCase.id}">Expected behavior:</label>
-                                            <textarea id="expected-${testCase.id}" class="form-control">${testCase.expected_behavior}</textarea>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        });
-                        testCasesEl.innerHTML = html;
-                        
-                        // Update the generate button to show badge
-                        const actionsEl = document.querySelector(`#ticket-${ticket.jira_key} .ticket-actions`);
-                        if (actionsEl) {
-                            actionsEl.innerHTML = `
-                                <span class="test-cases-badge">✅ Test Cases Generated</span>
-                                <button class="expand-button" onclick="expandTicket('${ticket.jira_key}')">▼</button>
-                            `;
-                        }
-                    }
-                }
-            });
-        }
-        
         // Initialize polling if fetch is running
         document.addEventListener('DOMContentLoaded', function() {
             const fetchStatus = document.getElementById('fetch-backlog-status').textContent;
             if (fetchStatus === 'running') {
-                pollFetchStatus();
+                // Use the polling from script.js by simulating a startPolling call
+                if (window.startPolling) {
+                    window.startPolling('fetch_backlog');
+                }
             }
         });
-        
-        // Function to manually add event listeners to all Jira buttons
-        function addManualEventListeners() {
-            console.log("🔧 Adding manual event listeners to all Jira buttons");
-            
-            // Find all buttons with the send-to-jira-btn class
-            const mainButtons = document.querySelectorAll('.send-to-jira-btn');
-            console.log(`Found ${mainButtons.length} .send-to-jira-btn buttons`);
-            
-            mainButtons.forEach(button => {
-                // Get the ticket ID from the button ID or closest ticket-item
-                let ticketId = null;
-                if (button.id && button.id.includes('send-to-jira-btn-')) {
-                    ticketId = button.id.replace('send-to-jira-btn-', '').replace('main-', '');
-                } else {
-                    const ticketItem = button.closest('.ticket-item');
-                    if (ticketItem && ticketItem.id) {
-                        ticketId = ticketItem.id.replace('ticket-', '');
-                    }
-                }
-                
-                if (ticketId) {
-                    console.log(`Adding manual click listener to button for ticket ${ticketId}`);
-                    
-                    // Replace the button with a completely new one using direct onclick
-                    const newButton = document.createElement('button');
-                    newButton.id = button.id || `send-to-jira-btn-direct-${ticketId}`;
-                    newButton.className = 'send-to-jira-btn direct-button';
-                    newButton.textContent = 'SEND TEST CASES TO JIRA';
-                    newButton.setAttribute('data-ticket-id', ticketId);
-                    
-                    // Use direct onclick attribute
-                    newButton.setAttribute('onclick', `sendToJira('${ticketId}'); event.stopPropagation(); return false;`);
-                    
-                    // Copy styling
-                    newButton.style.cssText = button.style.cssText + '; position: relative; z-index: 1000; cursor: pointer !important;';
-                    
-                    // Replace the old button
-                    if (button.parentNode) {
-                        button.parentNode.replaceChild(newButton, button);
-                    }
-                }
-            });
-            
-            // Find all emergency buttons too
-            const emergencyButtons = document.querySelectorAll('.emergency-jira-button');
-            console.log(`Found ${emergencyButtons.length} .emergency-jira-button buttons`);
-            
-            emergencyButtons.forEach(button => {
-                // The emergency button should be inside a ticket-item
-                const ticketItem = button.closest('.ticket-item');
-                if (ticketItem && ticketItem.id) {
-                    const ticketId = ticketItem.id.replace('ticket-', '');
-                    console.log(`Adding manual click listener to emergency button for ticket ${ticketId}`);
-                    
-                    // Replace with a new button using direct onclick
-                    const newButton = document.createElement('button');
-                    newButton.className = 'emergency-jira-button direct-button';
-                    newButton.textContent = 'Send to Jira';
-                    newButton.setAttribute('data-ticket-id', ticketId);
-                    
-                    // Use direct onclick attribute
-                    newButton.setAttribute('onclick', `sendToJira('${ticketId}'); event.stopPropagation(); return false;`);
-                    
-                    // Copy styling
-                    newButton.style.cssText = button.style.cssText + '; position: relative; z-index: 1000; cursor: pointer !important;';
-                    
-                    // Replace the old button
-                    if (button.parentNode) {
-                        button.parentNode.replaceChild(newButton, button);
-                    }
-                }
-            });
-        }
-    </script>
     </script>
     
-    <!-- Clean button fix solution -->
-    <script src="{{ url_for('static', filename='js/button-fix-clean.js') }}"></script>
+    <!-- Main application script -->
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    
+    <!-- Diagnostic button fix solution -->
+    <script src="{{ url_for('static', filename='js/diagnostic-button-fix.js') }}"></script>
 </body>
 </html>

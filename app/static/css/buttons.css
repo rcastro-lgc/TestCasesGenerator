@@ -1,0 +1,44 @@
+.button-group {
+    display: flex;
+    gap: 10px;
+}
+
+.run-button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 15px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+.run-button:hover {
+    background-color: #2980b9;
+}
+
+.run-button:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+}
+
+.stop-button {
+    background-color: var(--danger-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 15px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+.stop-button:hover {
+    background-color: #c0392b;
+}
+
+.stop-button:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+}

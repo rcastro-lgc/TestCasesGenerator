@@ -20,8 +20,7 @@ from app.db.model import SessionLocal, Ticket
 
 # Load environment variables
 load_dotenv()
-# Configure Gemini API
-genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
+# No need to call genai.configure; ensure GOOGLE_API_KEY is set in the environment
 
 def format_ticket_for_context(ticket, score=None):
     """Format a ticket for use as context in the prompt."""

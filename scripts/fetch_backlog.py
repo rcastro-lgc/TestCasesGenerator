@@ -45,7 +45,7 @@ def fetch_backlog():
         "Accept": "application/json",
         "Content-Type": "application/json"
     }
-    auth = (JIRA_USER, JIRA_API_TOKEN)
+    auth = (str(JIRA_USER), str(JIRA_API_TOKEN))
     params = {
         "jql": JQL,
         "fields": "summary,description,status,updated, issuetype",
@@ -55,6 +55,7 @@ def fetch_backlog():
     print("📡 Querying tickets from Jira...")
     response = requests.get(url, headers=headers, params=params, auth=auth)
 
+    issues = []
     if response.status_code == 200:
         issues = response.json().get("issues", [])
         for issue in issues:
