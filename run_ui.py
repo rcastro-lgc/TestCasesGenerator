@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ProRef UI - A web interface for running ProRef scripts
+FuzeTestAI UI - A web interface for running FuzeTestAI scripts
 """
 
 from app.ui import start

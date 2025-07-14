@@ -9,7 +9,7 @@ Base = declarative_base()
 
 # RUTA ABSOLUTA a la base
 base_dir = os.path.abspath(os.path.dirname(__file__))
-db_path = os.path.join(base_dir, '../../data/proref.db')
+db_path = os.path.join(base_dir, '../../data/FuzeTestAI.db')
 engine = create_engine(f'sqlite:///{db_path}', echo=False)
 
 SessionLocal = sessionmaker(bind=engine)

@@ -14,7 +14,7 @@ from pathlib import Path
 
 # Get the project root directory
 project_root = Path(__file__).resolve().parent.parent
-db_path = project_root / "data" / "proref.db"
+db_path = project_root / "data" / "FuzeTestAI.db"
 
 def connect_db():
     """Connect to the SQLite database."""

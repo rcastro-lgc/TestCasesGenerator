@@ -1,10 +1,10 @@
-# 🤖 ProRef — Product Refinement Automation Assistant
+# 🤖 FuzeTestAI — Product Refinement Automation Assistant
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-**ProRef** is an intelligent assistant designed to streamline your QA and product refinement workflows by leveraging AI and integrating directly with Jira.
+**FuzeTestAI** is an intelligent assistant designed to streamline your QA and product refinement workflows by leveraging AI and integrating directly with Jira.
 
 - [Features](#-features)
 - [Project Structure](#-project-structure)
@@ -65,8 +65,8 @@ tests/          # Unit tests
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/your-username/proref.git
-cd proref
+git clone https://github.com/your-username/FuzeTestAI.git
+cd FuzeTestAI
 ```
 
 2. Create and activate a virtual environment:
@@ -86,7 +86,7 @@ pip install -r requirements.txt
 
 ## ⚙️ Environment Setup
 
-To use ProRef, you need to set up the following environment variables:
+To use FuzeTestAI, you need to set up the following environment variables:
 
 ### Required Environment Variables
 
@@ -160,7 +160,7 @@ python scripts/test_gemini_setup.py
 
 ## 🌐 Web Interface
 
-ProRef includes a web interface for running scripts and viewing results.
+FuzeTestAI includes a web interface for running scripts and viewing results.
 
 ### Starting the Web Interface
 
@@ -188,7 +188,7 @@ Then access the UI at http://localhost:5000
 
 ## 💻 Command Line Usage
 
-ProRef can also be used from the command line:
+FuzeTestAI can also be used from the command line:
 
 - Fetch backlog tickets:
   ```bash
@@ -250,7 +250,7 @@ python scripts/utils/test_match.py path/to/text_file.txt
 
 ## 📘 Philosophy
 
-ProRef is not just automation. It's structured augmentation for QA and product teams — turning noisy backlogs and meetings into actionable, testable knowledge.
+FuzeTestAI is not just automation. It's structured augmentation for QA and product teams — turning noisy backlogs and meetings into actionable, testable knowledge.
 
 ---
 

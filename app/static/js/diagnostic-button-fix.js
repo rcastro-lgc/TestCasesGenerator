@@ -138,7 +138,7 @@ window.addEventListener('load', function() {
                         // Test cases not yet sent to Jira, show normal button
                         button.innerHTML = 'Send to Jira';
                         button.style.cssText = `
-                            background-color:rgb(30, 119, 221);
+                            background-color: #236c54;
                             color: white;
                             border: none;
                             border-radius: 4px;
@@ -182,7 +182,7 @@ window.addEventListener('load', function() {
                     button.innerHTML = 'Send to Jira';
                     
                     button.style.cssText = `
-                        background-color:rgb(30, 119, 221);
+                        background-color: #236c54;
                         color: white;
                         border: none;
                         border-radius: 4px;

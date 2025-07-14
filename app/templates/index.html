@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ProRef - Product Refinement Assistant</title>
+    <title>FuzeTestAI</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/env-alerts.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/test-cases.css') }}">
@@ -16,8 +16,11 @@
 <body>
     <div class="container">
         <header>
-            <h1>🤖 ProRef - Product Refinement Assistant</h1>
-            <p>Fetch tickets and generate test cases</p>
+            <div class="header-content">
+                <img src="{{ url_for('static', filename='img/fuzehealth-logo.png') }}" alt="FuzeHealth Logo" class="logo">
+                <h1>FuzeTestAI</h1>
+            </div>
+            <p>Fuze Health AI Test Cases Generator</p>
         </header>
 
         {% if missing_vars %}

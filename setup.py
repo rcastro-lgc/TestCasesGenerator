@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="proref",
+    name="FuzeTestAI",
     version="0.1.0",
     packages=find_packages(),
     install_requires=[
@@ -16,12 +16,12 @@ setup(
         "google-generativeai>=0.3.2"
     ],
     python_requires=">=3.8",
-    author="ProRef Team",
+    author="FuzeTestAI Team",
     author_email="eherrada@gmail.com",
     description="Product Refinement Automation Assistant",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/your-username/proref",
+    url="https://github.com/your-username/FuzeTestAI",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",

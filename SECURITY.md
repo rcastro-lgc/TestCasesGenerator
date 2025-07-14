@@ -10,11 +10,9 @@ We currently support the following versions with security updates:
 
 ## Reporting a Vulnerability
 
-We take the security of ProRef seriously. If you believe you have found a security vulnerability, please report it to us as described below.
+We take the security of FuzeTestAI seriously. If you believe you have found a security vulnerability, please report it to us as described below.
 
 **Please do not report security vulnerabilities through public GitHub issues.**
-
-Instead, please report them via email to `security@proref.dev`.
 
 You should receive a response within 48 hours. If for some reason you do not, please follow up via email to ensure we received your original message.
 
@@ -38,6 +36,6 @@ We prefer all communications to be in English.
 
 We take security vulnerabilities seriously. We appreciate your efforts to responsibly disclose your findings, and will make every effort to acknowledge your contributions.
 
-To report a security issue, please email `security@proref.dev` and include the word "SECURITY" in the subject line.
+To report a security issue, please email `security@FuzeTestAI.dev` and include the word "SECURITY" in the subject line.
 
-The ProRef team will send a response indicating the next steps in handling your report. After the initial reply to your report, the security team will keep you informed of the progress towards a fix and full announcement, and may ask for additional information or guidance. 
+The FuzeTestAI team will send a response indicating the next steps in handling your report. After the initial reply to your report, the security team will keep you informed of the progress towards a fix and full announcement, and may ask for additional information or guidance. 

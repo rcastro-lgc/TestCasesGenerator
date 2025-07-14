@@ -15,7 +15,7 @@
 }
 
 .run-button:hover {
-    background-color: #2980b9;
+    background-color: #1b5642; /* Darker shade of the primary color */
 }
 
 .run-button:disabled {
