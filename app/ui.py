@@ -768,6 +768,43 @@ def update_test_case(test_case_id):
         session.close()
         return jsonify({"success": False, "message": f"Error updating test case: {str(e)}"}), 500
 
+@app.route('/delete_test_case/<test_case_id>', methods=['POST'])
+def delete_test_case(test_case_id):
+    """Endpoint to delete a test case."""
+    from app.db.model import SessionLocal, TestCase
+
+    session = SessionLocal()
+
+    try:
+        # Get the test case by ID
+        test_case = session.query(TestCase).get(test_case_id)
+
+        if not test_case:
+            session.close()
+            return jsonify({"success": False, "message": f"Test case {test_case_id} not found"}), 404
+
+        # Store ticket ID for response
+        ticket_id = test_case.ticket_id
+        
+        # Delete the test case
+        session.delete(test_case)
+        session.commit()
+
+        session.close()
+        return jsonify({
+            "success": True, 
+            "message": "Test case deleted successfully",
+            "ticket_id": ticket_id
+        })
+
+    except Exception as e:
+        import traceback
+        print(f"Error deleting test case: {str(e)}")
+        print(traceback.format_exc())
+        session.rollback()
+        session.close()
+        return jsonify({"success": False, "message": f"Error deleting test case: {str(e)}"}), 500
+
 @app.route('/send_to_jira/<ticket_id>', methods=['POST'])
 def send_to_jira(ticket_id):
     """Send test cases as a comment to the corresponding Jira ticket."""

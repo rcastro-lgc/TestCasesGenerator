@@ -133,7 +133,10 @@ MODEL_TESTCASES=gemini-1.5-flash</code></pre>
                                                     <div class="test-case-view">
                                                         <div class="test-case-header">
                                                             <h5>Test Case {{ loop.index }}</h5>
-                                                            <button class="edit-test-case-btn" onclick="editTestCase('{{ test_case.id }}')">✏️ Edit</button>
+                                                            <div class="test-case-actions">
+                                                                <button class="edit-test-case-btn" onclick="editTestCase('{{ test_case.id }}')">✏️ Edit</button>
+                                                                <button class="delete-test-case-btn" onclick="deleteTestCase('{{ test_case.id }}')">❌ Delete</button>
+                                                            </div>
                                                         </div>
                                                         <p><strong>Scenario:</strong> <em>{{ test_case.scenario }}</em></p>
                                                         <p><strong>Action:</strong> <em>{{ test_case.action }}</em></p>
@@ -521,6 +524,52 @@ MODEL_TESTCASES=gemini-1.5-flash</code></pre>
                 saveBtn.disabled = false;
                 saveBtn.textContent = 'Save';
                 cancelBtn.disabled = false;
+            });
+        }
+
+        // Function to delete a test case
+        function deleteTestCase(testCaseId) {
+            // Confirm deletion
+            if (!confirm('Are you sure you want to delete this test case? This action cannot be undone.')) {
+                return;
+            }
+            
+            // Get the test case element
+            const testCaseEl = document.getElementById('test-case-' + testCaseId);
+            
+            // Show loading state
+            const deleteBtn = testCaseEl.querySelector('.delete-test-case-btn');
+            deleteBtn.disabled = true;
+            deleteBtn.textContent = 'Deleting...';
+            
+            // Send delete request to server
+            fetch('/delete_test_case/' + testCaseId, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove the test case element from the DOM
+                    testCaseEl.remove();
+                    
+                    // Show success message
+                    alert('Test case deleted successfully.');
+                } else {
+                    // Show error
+                    alert('Error: ' + data.message);
+                    
+                    // Reset button
+                    deleteBtn.disabled = false;
+                    deleteBtn.textContent = '❌ Delete';
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting test case:', error);
+                alert('Error deleting test case. Please try again.');
+                
+                // Reset button
+                deleteBtn.disabled = false;
+                deleteBtn.textContent = '❌ Delete';
             });
         }
         

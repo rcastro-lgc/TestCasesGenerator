@@ -48,6 +48,11 @@ class TestCase(Base):
     # Relationship to the parent ticket
     ticket = relationship("Ticket", back_populates="test_cases")
 
+def init_db():
+    """Initialize the database by creating all tables."""
+    Base.metadata.create_all(engine)
+    return engine
+
 class TicketEmbedding(Base):
     __tablename__ = 'ticket_embeddings'
 
