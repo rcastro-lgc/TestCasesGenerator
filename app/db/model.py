@@ -7,9 +7,13 @@ from sqlalchemy.orm import relationship
 
 Base = declarative_base()
 
-# RUTA ABSOLUTA a la base
-base_dir = os.path.abspath(os.path.dirname(__file__))
-db_path = os.path.join(base_dir, '../../data/FuzeTestAI.db')
+# Get database path from environment variable or use default
+# This allows for Docker configuration via environment variables
+db_path = os.environ.get('DATABASE_PATH')
+if not db_path:
+    base_dir = os.path.abspath(os.path.dirname(__file__))
+    db_path = os.path.join(base_dir, '../../data/proref.db')
+
 engine = create_engine(f'sqlite:///{db_path}', echo=False)
 
 SessionLocal = sessionmaker(bind=engine)
@@ -48,10 +52,3 @@ class TicketEmbedding(Base):
     __tablename__ = 'ticket_embeddings'
 
     ticket_id = Column(String, ForeignKey('tickets.id'), primary_key=True)
-    embedding = Column(LargeBinary, nullable=False)
-
-    ticket = relationship("Ticket")
-
-def init_db():
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    Base.metadata.create_all(engine)

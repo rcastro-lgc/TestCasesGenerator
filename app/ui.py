@@ -970,4 +970,4 @@ def start():
     Start the Flask application with debug mode enabled.
     This function is called from run_ui.py
     """
-    app.run(debug=True)
+    app.run(host='0.0.0.0', debug=True)

@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  sqlite:
+    image: alpine/sqlite:3.49.2
+    container_name: fuzeteai-sqlite
+    volumes:
+      - ./data:/data
+      - ./init-sqlite.sh:/init-sqlite.sh
+    environment:
+      - SQLITE_DATABASE=proref.db
+    ports:
+      - "9000:9000"
+    entrypoint: ["/bin/sh", "/init-sqlite.sh"]
+    stdin_open: true
+    tty: true
+    
+  app:
+    build: .
+    container_name: fuzeteai-app
+    volumes:
+      - .:/app
+      - ./data:/data
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_PATH=/data/proref.db
+      - FLASK_APP=app.ui
+      - FLASK_ENV=development
+    depends_on:
+      - sqlite
+    stdin_open: true
+    tty: true
